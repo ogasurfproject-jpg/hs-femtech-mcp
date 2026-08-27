@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+.dev.vars
+*_控え.txt
+*控え*.txt
+.DS_Store

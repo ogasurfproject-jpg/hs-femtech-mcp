@@ -1,0 +1,31 @@
+{
+	// hs-femtech-mcp  /  フェムCP v0.3 (P1)
+	// 独立worker。既定では binding 無しでもデプロイでき、その場合は永続化オフ(P0挙動=検証プレビュー)。
+	// アカウントは HORIZON SHIELD 側(c15ff64a / oga.surf.project@gmail.com)。
+	// deploy 前に必ず: npx wrangler whoami で c15ff64a を確認。
+	"name": "hs-femtech-mcp",
+	"main": "src/worker.js",
+	"compatibility_date": "2026-08-01",
+	"kv_namespaces": [
+		{
+			"binding": "FEMTECH_KV",
+			"id": "a7d37d3fa02b462ba239dab1dd70aaf2"
+		}
+	]
+	// ---- P1: 記憶を有効化する時だけ、下を有効にする(段階導入) ----
+	// 手順(TOshi手):
+	//   1) npx wrangler kv namespace create FEMTECH_KV
+	//      → 出てきた id を下の "id" に貼る
+	//   2) この kv_namespaces ブロックのコメントを外す
+	//   3) npx wrangler deploy
+	//   4) 管理鍵を入れる: printf '%s' "$(openssl rand -hex 24)" | npx wrangler secret put FEMTECH_ADMIN
+	//      (控えは iCloud メモへ。番人は値を持たない)
+	//   5) seed を verified で保存: curl "$BASE/admin/reverify_seed?key=<FEMTECH_ADMIN>"
+	//
+	// "kv_namespaces": [
+	//   { "binding": "FEMTECH_KV", "id": "ここにnpx wrangler kv namespace createのidを貼る" }
+	// ]
+	//
+	// 公開 register_source の永続化を許可する場合のみ(既定オフ推奨):
+	// "vars": { "FEMTECH_PUBLIC_WRITE": "1" }
+}
