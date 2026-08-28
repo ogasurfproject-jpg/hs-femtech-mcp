@@ -3,16 +3,30 @@
 **A neutral, verifiable registry of femtech (women's health) information sources.**
 It does not diagnose, does not claim products work, does not take referral fees, and does not pretend to be a medical authority. It verifies *who* stands behind a source, *under which jurisdiction*, *with what compensation*, and lets anyone re-compute the proof.
 
-![MCP](https://img.shields.io/badge/MCP-JSON--RPC%202.0-3FE0CE)
-![A2A](https://img.shields.io/badge/A2A-agent--card-5B8DEF)
-![referral_fee](https://img.shields.io/badge/referral__fee-false-3FE0CE)
-![listing_fee](https://img.shields.io/badge/listing__fee-false-3FE0CE)
-![medical advice](https://img.shields.io/badge/medical%20advice-none-E8B14C)
-![license](https://img.shields.io/badge/license-MIT-889)
+[![Verification Gate](https://img.shields.io/badge/Verification%20Gate-verified-3FE0CE?labelColor=0E141D)](https://hs-verify-gate.oga-surf-project.workers.dev/check)
+![MCP](https://img.shields.io/badge/MCP-JSON--RPC%202.0-5B8DEF?labelColor=0E141D)
+![A2A](https://img.shields.io/badge/A2A-agent--card-5B8DEF?labelColor=0E141D)
+![paid_by](https://img.shields.io/badge/paid__by-public-3FE0CE?labelColor=0E141D)
+![referral_fee](https://img.shields.io/badge/referral__fee-false-3FE0CE?labelColor=0E141D)
+![listing_fee](https://img.shields.io/badge/listing__fee-false-3FE0CE?labelColor=0E141D)
+![topics](https://img.shields.io/badge/topics-menstruation%20%C2%B7%20PMS%20%C2%B7%20menopause-5B8DEF?labelColor=0E141D)
+![verified sources](https://img.shields.io/badge/verified%20sources-11-5B8DEF?labelColor=0E141D)
+![medical advice](https://img.shields.io/badge/medical%20advice-none-E8B14C?labelColor=0E141D)
+![license](https://img.shields.io/badge/license-MIT-8892A0?labelColor=0E141D)
 
-Live endpoint: `https://hs-femtech-mcp.oga-surf-project.workers.dev`
+Live endpoint: `https://femtech.horizonshield.dev` (also `https://hs-femtech-mcp.oga-surf-project.workers.dev`)
 
 ---
+
+## Verified
+
+This server passes the HORIZON SHIELD Verification Gate (`status: verified`): reachable, MCP conformant, agent-card published, compensation disclosed (`paid_by: public`, no referral or listing fees), and deterministic. It holds itself to the same bar it would apply to anyone else. Re-check it yourself, no trust in us required:
+
+```bash
+curl -s -X POST "https://hs-verify-gate.oga-surf-project.workers.dev/check" \
+  -H "content-type: application/json" \
+  -d '{"endpoint":"https://femtech.horizonshield.dev/"}'
+```
 
 ## Why this exists
 

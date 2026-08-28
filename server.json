@@ -10,13 +10,13 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://hs-femtech-mcp.oga-surf-project.workers.dev/"
+      "url": "https://femtech.horizonshield.dev/"
     }
   ],
   "_meta": {
     "provider": "The HORIZ音s株式会社",
-    "agent_card": "https://hs-femtech-mcp.oga-surf-project.workers.dev/.well-known/agent-card.json",
-    "llms_txt": "https://hs-femtech-mcp.oga-surf-project.workers.dev/llms.txt",
+    "agent_card": "https://femtech.horizonshield.dev/.well-known/agent-card.json",
+    "llms_txt": "https://femtech.horizonshield.dev/llms.txt",
     "compensation": { "paid_by": "none", "referral_fee": false, "listing_fee": false },
     "note": "MCPレジストリの現行スキーマに合わせて微調整して提出(hs-mcpと同じ要領)。ツール名は tools/list の8本と一致させる。"
   }
