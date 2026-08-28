@@ -59,6 +59,8 @@ const PRODUCT_CATEGORIES = [
 
 const AGENT_CARD = {
   name: "HORIZON SHIELD Femtech Registry",
+  description: "Neutral verification registry for femtech (women's health) information sources. Indexes sources by provenance, authority tier, jurisdiction and machine-readable compensation disclosure with re-computable SHA-256. No diagnosis, no efficacy claims, no product endorsement, no referral fees.",
+  url: "https://femtech.horizonshield.dev/",
   version: VERSION,
   provider: "The HORIZ音s株式会社",
   protocol: "A2A (Agent2Agent)",
@@ -67,7 +69,7 @@ const AGENT_CARD = {
     { id: "femtech-information-registry", note: "世界のフェム情報源を出典・権威・管轄・報酬開示で検証し束ねる / verify and index femtech information sources" },
     { id: "verify-source", note: "登録エントリの第三者検証(改ざんなし=untampered。医学的真偽の判定ではない) / third-party verification of an entry, fail closed" }
   ],
-  compensation: { paid_by: "none", referral_fee: false, listing_fee: false, success_fee_pct: 0, disclosure_url: "https://shield.the-horizons-innovation.com/" },
+  compensation: { paid_by: "public", referral_fee: false, listing_fee: false, success_fee_pct: 0, disclosure_url: "https://shield.the-horizons-innovation.com/" },
   mcp_endpoint: "POST / (JSON-RPC 2.0)",
   discovery: { llms_txt: "/llms.txt", agent_card: "/.well-known/agent-card.json", registry_index: "/registry" },
   medical_disclaimer: DISCLAIMER
