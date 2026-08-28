@@ -1,3 +1,5 @@
+![HORIZON SHIELD Femtech Registry — neutral, verifiable registry of femtech information sources. MCP and A2A. No diagnosis, no referral fees.](./banner.jpg)
+
 # HORIZON SHIELD Femtech Registry
 
 **A neutral, verifiable registry of femtech (women's health) information sources.**
