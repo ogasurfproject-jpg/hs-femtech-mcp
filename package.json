@@ -1,6 +1,31 @@
 {
   "name": "hs-femtech-mcp",
-  "version": "0.2.0",
-  "private": true,
-  "type": "module"
+  "version": "0.3.0",
+  "description": "Neutral verification registry for femtech (women's health) information sources. Indexes sources by provenance, authority tier, jurisdiction, and machine-readable compensation disclosure, with a re-computable SHA-256. No diagnosis, no efficacy claims, no product endorsement, no referral fees. MCP (JSON-RPC 2.0) + A2A agent card.",
+  "type": "module",
+  "license": "MIT",
+  "author": "The HORIZ音s株式会社 (HORIZON SHIELD)",
+  "homepage": "https://shield.the-horizons-innovation.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ogasurfproject-jpg/hs-femtech-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ogasurfproject-jpg/hs-femtech-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "a2a",
+    "femtech",
+    "womens-health",
+    "verification",
+    "registry",
+    "provenance",
+    "neutral",
+    "horizon-shield"
+  ],
+  "scripts": {
+    "test": "node test/harness.mjs"
+  }
 }
