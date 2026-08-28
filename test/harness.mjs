@@ -106,5 +106,50 @@ const s1 = await W.selfCheck({});
 const s2 = await W.selfCheck({ FEMTECH_KV: memKV() });
 ok("self: neutral+persistence(none/kv)を反映", s1.neutral === true && s1.persistence === "none" && s2.persistence === "kv" && s1.medical_authority_claimed === false);
 
+// 18 check_source: 収録済みドメインは in_registry + trust_card + scope限定
+const cs1 = await W.tool_check_source({ url: "https://www.nhs.uk/conditions/menopause/" }, {});
+ok("check_source: 収録ドメインは in_registry(trust_card付き)", cs1.verdict === "in_registry" && Array.isArray(cs1.trust_card) && cs1.trust_card.length >= 1 && cs1.scope === "provenance_and_disclosure_only");
+
+// 19 未収録は not_in_registry(中立注記+自己診断+代替源)。否定判定をしない
+const cs2 = await W.tool_check_source({ url: "https://random-influencer.example/post", topic: "pms" }, {});
+ok("check_source: 未収録は中立(neutral_note+self_check+代替源)", cs2.verdict === "not_in_registry" && !!cs2.neutral_note && cs2.self_check.length >= 3 && cs2.verified_alternatives.length >= 1);
+
+// 20 入力なしは no_input
+const cs3 = await W.tool_check_source({}, {});
+ok("check_source: 入力なしは no_input", cs3.verdict === "no_input");
+
+// 21 掟: 真偽・効能・製品評価のキーを一切返さない
+const csAll = JSON.stringify([cs1, cs2, cs3]).toLowerCase();
+ok("check_source: 真偽/効能/推奨/安全の判定を返さない", !/(is_true|efficacy|effective|"works"|trustworthy|recommend|scam|"safe"|unsafe)/.test(csAll));
+
+// 22 症状入力は無視(個人健康データを持たない)
+const cs4 = await W.tool_check_source({ symptom: "痛い", url: "https://random.example/x" }, {});
+ok("check_source: 未知の症状フィールドは無視(健康データ非保持)", !JSON.stringify(cs4).includes("痛い"));
+
+// 23 発見配線: checker が self/agent-card/llms に露出
+ok("discovery: self.human_checker=/checker", (await W.selfCheck({})).human_checker === "/checker");
+ok("discovery: agent_card.discovery.source_checker=/checker", W.tool_get_agent_card().discovery.source_checker === "/checker");
+ok("discovery: llms.txt に /checker", /\/checker/.test(W.llmsTxt()));
+
+// 24 公開ページ: 二言語HTML・中立コピー(両言語)・症状は入力させない
+const page = W.checkerPage();
+ok("checkerPage: 二言語HTML+中立コピー+症状は入力させない", /<!doctype html>/i.test(page) && /未収録/.test(page) && /Not yet verified/.test(page) && /真偽も裁きません/.test(page) && /never rule on whether a claim is true/i.test(page) && /症状は入力しないでください/.test(page));
+
+// 25 tools/list に check_source(read-only)
+const tl2 = await W.handleRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, {});
+const cst = tl2.result.tools.find(t => t.name === "check_source");
+ok("tools/list に check_source(readOnlyHint)", !!cst && cst.annotations.readOnlyHint === true);
+
+// 26 verified バッジ: 収録=Verified source / 未収録=Not in registry / 医学的正しさは主張しない
+const bIn = W.badgeSvg(W.REGISTRY[3]);
+const bOut = W.badgeSvg(null);
+ok("badge: 収録=Verified/未収録=Not in registry/真偽非主張", /Verified source/.test(bIn) && /Not in registry/.test(bOut) && !/accurate|correct|"true"|recommend/i.test(bIn) && /Not a judgment of medical accuracy/.test(bIn) && /<svg/.test(bIn));
+const fs1 = await W.findSource({}, new URL("https://h/badge?url=https://www.acog.org/").searchParams);
+ok("badge findSource: 収録ドメインを引ける", !!fs1 && /ACOG/.test(fs1.publisher));
+
+// 27 初心者ガイド(startPage): 二言語HTML・診断しない明記・checker導線
+const sp = W.startPage();
+ok("startPage: 二言語+診断否定+checker導線", /<!doctype html>/i.test(sp) && /New to femtech/.test(sp) && /はじめてのフェムテック/.test(sp) && /does not diagnose/.test(sp) && /診断はせず/.test(sp) && /href="\/checker"/.test(sp));
+
 console.log(`\n  ${pass} green / ${fail} red`);
 if (fail > 0) process.exit(1);
