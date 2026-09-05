@@ -57,7 +57,38 @@ const PRODUCT_CATEGORIES = [
   { category_id: "absorbent_underwear", lang: "ja", name: "吸水ショーツ", description: "吸水性のある層を備えた下着の総称です。吸水量や構造は製品により異なります。用途や併用の要否には個人差があります。ここでは種類の一般的な説明のみを行い、特定銘柄の推奨や効能の断定は行いません。" }
 ];
 
+// --- A2A Conduct Extension v1 (2026-09-06) ---
+// 誰が払うか、行儀の記録(第三者が書いた物)がどこか、繋いだ相手が自分の観測をどこに出せるか。
+// card の capabilities.extensions[] に置く(A2A 1.0 の正規の場所)。top-level の compensation は旧読者のために残す。
+// 扉 0.3.2 は両方読んで 5 鍵の一致を要求する。仕様は URI そのもの。点数も判定も無い。
+const CONDUCT_EXT_URI = "https://gate.horizonshield.dev/ext/conduct/v1";
+const FEMTECH_COMPENSATION = { paid_by: "public", referral_fee: false, listing_fee: false, success_fee_pct: 0, disclosure_url: "https://shield.the-horizons-innovation.com/" };
+function conductExtension(measuredEndpoint, compensation) {
+  return {
+    uri: CONDUCT_EXT_URI,
+    description: "Who pays this agent, where its measured conduct record lives, and where to file a witness walk. The specification is served at the URI.",
+    required: false,
+    params: {
+      compensation,
+      measured_endpoints: [measuredEndpoint],
+      conduct_record: "https://gate.horizonshield.dev/history?endpoint=" + encodeURIComponent(measuredEndpoint),
+      verdict_recipe: "https://gate.horizonshield.dev/spec",
+      witness_intake: "https://ledger.horizonshield.dev/witness",
+      register: "https://gate.horizonshield.dev/register",
+      rings: {
+        spec: "https://github.com/ogasurfproject-jpg/horizon-shield/blob/main/workers/hs-ledger/nenrin/NENRIN_SPEC_v1.md",
+        spec_sha256: "9ccba2e325fd2a555fcdb2dec519b8c6bf7a669064674846aea98ecfff824e3d",
+        base: "https://raw.githubusercontent.com/ogasurfproject-jpg/mcp-conduct-register/main/rings/",
+        path: "<slug>/<YYYY-MM>.json",
+        slug: "endpoint URL without https://, lower case, every run of characters outside [a-z0-9] replaced by one hyphen, hyphens trimmed at both ends",
+        ledger: "https://ledger.horizonshield.dev/ledger"
+      }
+    }
+  };
+}
+
 const AGENT_CARD = {
+  capabilities: { streaming: false, pushNotifications: false, extensions: [conductExtension("https://femtech.horizonshield.dev/mcp", FEMTECH_COMPENSATION)] },
   name: "HORIZON SHIELD Femtech Registry",
   description: "Neutral verification registry for femtech (women's health) information sources. Indexes sources by provenance, authority tier, jurisdiction and machine-readable compensation disclosure with re-computable SHA-256. No diagnosis, no efficacy claims, no product endorsement, no referral fees.",
   url: "https://femtech.horizonshield.dev/",
@@ -69,7 +100,7 @@ const AGENT_CARD = {
     { id: "femtech-information-registry", note: "世界のフェム情報源を出典・権威・管轄・報酬開示で検証し束ねる / verify and index femtech information sources" },
     { id: "verify-source", note: "登録エントリの第三者検証(改ざんなし=untampered。医学的真偽の判定ではない) / third-party verification of an entry, fail closed" }
   ],
-  compensation: { paid_by: "public", referral_fee: false, listing_fee: false, success_fee_pct: 0, disclosure_url: "https://shield.the-horizons-innovation.com/" },
+  compensation: FEMTECH_COMPENSATION,
   mcp_endpoint: "POST / (JSON-RPC 2.0)",
   discovery: { llms_txt: "/llms.txt", agent_card: "/.well-known/agent-card.json", registry_index: "/registry", source_checker: "/checker", source_check_api: "/check-source", verified_badge: "/badge", beginner_guide: "/start" },
   medical_disclaimer: DISCLAIMER
