@@ -63,6 +63,40 @@ const PRODUCT_CATEGORIES = [
 // 扉 0.3.2 は両方読んで 5 鍵の一致を要求する。仕様は URI そのもの。点数も判定も無い。
 const CONDUCT_EXT_URI = "https://gate.horizonshield.dev/ext/conduct/v1";
 const FEMTECH_COMPENSATION = { paid_by: "public", referral_fee: false, listing_fee: false, success_fee_pct: 0, disclosure_url: "https://shield.the-horizons-innovation.com/" };
+
+// ---- Agent Card 署名 (A2A 1.0 §8.4: JWS ES256 over RFC 8785 of the proto-shaped card, signatures 欄は除く) ----
+// 署名は Worker の中では作らん。鍵を持つ Mac の上で workers/a2a-card-sign/sign.mjs が公式 SDK(@a2a-js/sdk)の generator で計算し、
+// 下の定数を書き換える(配備前、commit 対象)。Worker は鍵を持たず、公開鍵だけを /.well-known/jwks.json で配る。
+// card の中身が変わったら署名は必ず作り直す。作り直さんと検証で落ちる = 改ざんと同じ顔になる。それが正しい。
+// 署名は正規の origin(CARD_CANONICAL_ORIGIN)で配る card にだけ付ける。workers.dev の別名で開いた card は signatures 無し。
+/* @@CARD_SIGNATURE_BEGIN */
+const CARD_SIGNATURE = {
+  "kid": "hs-2026-09",
+  "jku": "https://femtech.horizonshield.dev/.well-known/jwks.json",
+  "alg": "ES256",
+  "protected": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpPU0UiLCJraWQiOiJocy0yMDI2LTA5Iiwiamt1IjoiaHR0cHM6Ly9mZW10ZWNoLmhvcml6b25zaGllbGQuZGV2Ly53ZWxsLWtub3duL2p3a3MuanNvbiJ9",
+  "signature": "06TIwoqqUswedWgLhnPkFXxG38XwpwoFaMDIdrJ0TJN0cewXgxQ7QZrWqUGCbrjr01qHuuMIU06r8JecSUkn1g",
+  "jwk": {
+    "kty": "EC",
+    "x": "CytwnuXFtXi7PFCcF-TCbvW5OgOg4KuWRLeRvdfHWLs",
+    "y": "Zha3FI2QplMaGveXjrIg8PxrZ6dTjHmESoGs88uAIiA",
+    "crv": "P-256",
+    "kid": "hs-2026-09",
+    "alg": "ES256",
+    "use": "sig"
+  },
+  "canonical_sha256": "8c98e665d5d21e48cdfd320c1552ae84754bae46dcb786f5a5d4fa2858d1073a"
+};
+/* @@CARD_SIGNATURE_END */
+const CARD_CANONICAL_ORIGIN = "https://femtech.horizonshield.dev";
+function withCardSignature(card, origin) {
+  if (!CARD_SIGNATURE || !CARD_SIGNATURE.protected || !CARD_SIGNATURE.signature) return card;
+  if (String(origin || "").replace(/\/+$/, "") !== CARD_CANONICAL_ORIGIN) return card;
+  return Object.assign({}, card, { signatures: [{ protected: CARD_SIGNATURE.protected, signature: CARD_SIGNATURE.signature }] });
+}
+function jwksDocument() {
+  return { keys: CARD_SIGNATURE && CARD_SIGNATURE.jwk ? [CARD_SIGNATURE.jwk] : [] };
+}
 function conductExtension(measuredEndpoint, compensation) {
   return {
     uri: CONDUCT_EXT_URI,
@@ -87,18 +121,31 @@ function conductExtension(measuredEndpoint, compensation) {
   };
 }
 
+// 2026-09-06 第二波(femtech): card を A2A 1.0 の形に揃える。以前は provider が文字列、skills に name/description/tags が無く、
+// url が MCP しか喋らん root を指しとった(公式 SDK は読めん、A2A client が POST しても -32601)。1.0 の supportedInterfaces と
+// 0.3 の url/preferredTransport/protocolVersion を同居、両方 /a2a を指す。旧来の独自鍵(protocol/role/mcp_endpoint/discovery/compensation)は残す。
+const A2A_URL = "https://femtech.horizonshield.dev/a2a";
 const AGENT_CARD = {
+  supportedInterfaces: [
+    { url: A2A_URL, protocolBinding: "JSONRPC", protocolVersion: "1.0" },
+    { url: A2A_URL, protocolBinding: "JSONRPC", protocolVersion: "0.3" }
+  ],
+  protocolVersion: "0.3.0",
+  url: A2A_URL,
+  preferredTransport: "JSONRPC",
   capabilities: { streaming: false, pushNotifications: false, extensions: [conductExtension("https://femtech.horizonshield.dev/mcp", FEMTECH_COMPENSATION)] },
   name: "HORIZON SHIELD Femtech Registry",
   description: "Neutral verification registry for femtech (women's health) information sources. Indexes sources by provenance, authority tier, jurisdiction and machine-readable compensation disclosure with re-computable SHA-256. No diagnosis, no efficacy claims, no product endorsement, no referral fees.",
-  url: "https://femtech.horizonshield.dev/",
   version: VERSION,
-  provider: "The HORIZ音s株式会社",
+  provider: { organization: "The HORIZ音s株式会社", url: "https://shield.the-horizons-innovation.com/" },
+  documentationUrl: "https://femtech.horizonshield.dev/llms.txt",
+  defaultInputModes: ["text/plain", "application/json"],
+  defaultOutputModes: ["application/json", "text/plain"],
   protocol: "A2A (Agent2Agent)",
   role: "neutral verification registry for femtech information sources (not a medical authority)",
   skills: [
-    { id: "femtech-information-registry", note: "世界のフェム情報源を出典・権威・管轄・報酬開示で検証し束ねる / verify and index femtech information sources" },
-    { id: "verify-source", note: "登録エントリの第三者検証(改ざんなし=untampered。医学的真偽の判定ではない) / third-party verification of an entry, fail closed" }
+    { id: "femtech-information-registry", name: "Femtech information source registry", description: "Verifies and indexes femtech (women's health) information sources by provenance, authority tier, jurisdiction and compensation disclosure. Send a URL or a publisher name as a text part and get back who publishes it, in what capacity, and whether a conflict of interest is disclosed. Never rules on whether a claim is true.", tags: ["femtech", "women's-health", "provenance", "registry", "neutral"], examples: ["Is https://example.org/pms-guide a verified source?", "この URL の発信元は検証済みか"], note: "世界のフェム情報源を出典・権威・管轄・報酬開示で検証し束ねる / verify and index femtech information sources" },
+    { id: "verify-source", name: "Third-party verification of a registry entry", description: "Recomputes the canonical bytes and SHA-256 of a registry entry and compares them with the stored provenance. Fail closed. Untampered is not the same as medically true.", tags: ["verification", "sha256", "fail-closed", "tamper-evident"], note: "登録エントリの第三者検証(改ざんなし=untampered。医学的真偽の判定ではない) / third-party verification of an entry, fail closed" }
   ],
   compensation: FEMTECH_COMPENSATION,
   mcp_endpoint: "POST / (JSON-RPC 2.0)",
@@ -329,6 +376,94 @@ async function runTool(name, args, env) {
   return emit(raw);
 }
 
+// ---- A2A (2026-09-06 第二波) ----
+// 公式 SDK の実測: 0.3 互換路は X-A2A-Extensions を送る。1.0 の綴りは A2A-Extensions。読むのは両方、echo は A2A-Extensions + 要求の綴り。
+// 線の版は method 名(SendMessage = 1.0、message/send = 0.3)。1.0 は {message} に包み ROLE_* / kind 無し、0.3 は従来の形。
+const A2A_EXT_HEADER = "A2A-Extensions";
+const A2A_EXT_HEADER_LEGACY = "X-A2A-Extensions";
+const A2A_VERSION_HEADER = "A2A-Version";
+function a2aRequestedExtensionUris(request) {
+  const out = [];
+  for (const name of [A2A_EXT_HEADER, A2A_EXT_HEADER_LEGACY]) {
+    const h = request.headers.get(name) || "";
+    for (const u of h.split(",")) { const t = u.trim(); if (t && !out.includes(t)) out.push(t); }
+  }
+  return out;
+}
+function a2aActivatedExtensions(request) { return a2aRequestedExtensionUris(request).filter((u) => u === CONDUCT_EXT_URI); }
+function a2aEchoHeaders(request, activated) {
+  if (!activated.length) return {};
+  const h = {}; h[A2A_EXT_HEADER] = activated.join(",");
+  if (request.headers.get(A2A_EXT_HEADER_LEGACY)) h[A2A_EXT_HEADER_LEGACY] = activated.join(",");
+  return h;
+}
+function a2aWire(method, request) {
+  if (method === "SendMessage") return "1.0";
+  if (method === "message/send") return "0.3";
+  const v = ((request && request.headers.get(A2A_VERSION_HEADER)) || "").trim();
+  return v.startsWith("1.") ? "1.0" : "0.3";
+}
+function a2aPartText(p) { return p && typeof p === "object" && typeof p.text === "string" && (p.kind === undefined || p.kind === "text") ? p.text : null; }
+function a2aPart10(p) {
+  if (!p || typeof p !== "object") return p;
+  const o = {};
+  if (p.kind === "text" || typeof p.text === "string") o.text = String(p.text === undefined ? "" : p.text);
+  else if (p.kind === "data" || p.data !== undefined) o.data = p.data;
+  else { for (const k of Object.keys(p)) if (k !== "kind") o[k] = p[k]; }
+  if (p.metadata && typeof p.metadata === "object") o.metadata = p.metadata;
+  return o;
+}
+function a2aMessage10(m) {
+  const o = {};
+  for (const k of Object.keys(m)) { if (k === "kind" || k === "role" || k === "parts") continue; o[k] = m[k]; }
+  o.role = m.role === "user" ? "ROLE_USER" : m.role === "agent" ? "ROLE_AGENT" : "ROLE_UNSPECIFIED";
+  o.parts = Array.isArray(m.parts) ? m.parts.map(a2aPart10) : [];
+  return o;
+}
+function a2aSendMessageResult(result, wire) {
+  if (wire !== "1.0" || !result || typeof result !== "object") return result;
+  if (result.kind === "message") return { message: a2aMessage10(result) };
+  return result;
+}
+function conductMetadata() {
+  const m = {};
+  m[CONDUCT_EXT_URI + "/endpoint"] = "https://femtech.horizonshield.dev/mcp";
+  m[CONDUCT_EXT_URI + "/conduct_record"] = "https://gate.horizonshield.dev/history?endpoint=" + encodeURIComponent("https://femtech.horizonshield.dev/mcp");
+  m[CONDUCT_EXT_URI + "/witness_intake"] = "https://ledger.horizonshield.dev/witness";
+  return m;
+}
+function a2aAttachConduct(result) {
+  result.metadata = Object.assign({}, result.metadata || {}, conductMetadata());
+  const ex = Array.isArray(result.extensions) ? result.extensions.slice() : [];
+  if (!ex.includes(CONDUCT_EXT_URI)) ex.push(CONDUCT_EXT_URI);
+  result.extensions = ex;
+  return result;
+}
+// A2A の口: text part の URL か発信元名を check_source に渡す(出どころと開示だけ。真偽も良し悪しも症状も扱わん)。
+// 入力が無ければ check_source の no_input 案内をそのまま Message で返す(エラーにせん)。
+async function handleA2A(request, env, headersBase) {
+  let b; try { b = await request.json(); } catch (e) { b = null; }
+  const rid = b && b.id !== undefined ? b.id : null;
+  const activated = a2aActivatedExtensions(request);
+  const echo = a2aEchoHeaders(request, activated);
+  const send = (payload, status) => new Response(JSON.stringify(Object.assign({ jsonrpc: "2.0", id: rid }, payload), null, 2), { status: status || 200, headers: Object.assign({}, headersBase, echo) });
+  if (!b || b.jsonrpc !== "2.0") return send({ error: { code: -32600, message: "invalid request: jsonrpc 2.0 envelope required" } });
+  if (b.method !== "SendMessage" && b.method !== "message/send")
+    return send({ error: { code: -32601, message: "method not found: " + String(b.method) + ". This agent implements SendMessage (1.0) and message/send (0.3); send a URL or a publisher name as a text part." } });
+  const wire = a2aWire(b.method, request);
+  const parts = (b.params && b.params.message && Array.isArray(b.params.message.parts)) ? b.params.message.parts : [];
+  const text = parts.map(a2aPartText).filter((x) => typeof x === "string").join(" ").trim();
+  const urlm = text.match(/https?:\/\/[^\s"'<>]+/);
+  const args = urlm ? { url: urlm[0].replace(/[.,;:)\]]+$/, "") } : (text ? { publisher: text.slice(0, 200) } : {});
+  const out = emit(await tool_check_source(args, env));
+  const line = out.found === null
+    ? String(out.input_note || "Send a URL or a publisher name as a text part.")
+    : (out.found ? "Verified source on this registry: who publishes it, in what capacity, and what conflict of interest is disclosed are in the data part. This is provenance and disclosure only, not a ruling on whether the content is true." : "Not on this registry: unverified, which is not the same as untrustworthy. The data part lists what to check yourself and the verified primary sources for the topic.");
+  let result = { kind: "message", role: "agent", messageId: crypto.randomUUID(), parts: [{ kind: "text", text: line }, { kind: "data", data: out }] };
+  if (activated.includes(CONDUCT_EXT_URI)) result = a2aAttachConduct(result);
+  return send({ result: a2aSendMessageResult(result, wire) });
+}
+
 // ---- MCP JSON-RPC ----
 function rpcResult(id, result) { return { jsonrpc: "2.0", id, result }; }
 function rpcError(id, code, message) { return { jsonrpc: "2.0", id, error: { code, message } }; }
@@ -368,6 +503,7 @@ function llmsTxt() {
     "- GET  /check-source?url=...  出どころの検証状態(誰が・権威・管轄・報酬開示)をJSONで返す。真偽は判定しない。",
     "- GET  /self        自己の中立性の宣言と検証",
     "- GET  /.well-known/agent-card.json  A2A エージェントカード",
+    "- POST /a2a  A2A JSON-RPC(SendMessage 1.0 / message/send 0.3): URL か発信元名を text part で渡すと出どころと開示を返す",
     "",
     "## 論点 / Topics",
     "- menstruation, pms, menopause (P1)",
@@ -726,7 +862,7 @@ async function anchorPending(env) {
 }
 
 // ---- HTTP ----
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*", "access-control-allow-headers": "content-type, authorization", "access-control-allow-methods": "GET, POST, OPTIONS" };
+const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*", "access-control-allow-headers": "content-type, authorization, a2a-extensions, x-a2a-extensions, a2a-version", "access-control-expose-headers": "a2a-extensions, x-a2a-extensions", "access-control-allow-methods": "GET, POST, OPTIONS" };
 
 async function selfCheck(env) {
   const meetsCompensation = AGENT_CARD.compensation.referral_fee === false && AGENT_CARD.compensation.listing_fee === false;
@@ -741,7 +877,8 @@ export default {
 
     if (url.pathname === "/health") return j({ ok: true, server: "hs-femtech-mcp", version: VERSION });
     if (url.pathname === "/self") return j(await selfCheck(env));
-    if (url.pathname === "/.well-known/agent-card.json") return j(AGENT_CARD);
+    if (url.pathname === "/.well-known/agent-card.json") return j(withCardSignature(AGENT_CARD, url.origin));
+    if (url.pathname === "/.well-known/jwks.json") return j(jwksDocument());
     if (url.pathname === "/llms.txt") return new Response(llmsTxt(), { headers: { "content-type": "text/plain; charset=utf-8", "access-control-allow-origin": "*" } });
     if (url.pathname === "/registry" && request.method === "GET") return j(emit(await tool_list_registry(Object.fromEntries(url.searchParams), env)));
     if (url.pathname === "/checker") return new Response(checkerPage(), { headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*" } });
@@ -749,16 +886,21 @@ export default {
     if (url.pathname === "/check-source" && request.method === "GET") return j(emit(await tool_check_source(Object.fromEntries(url.searchParams), env)));
     if (url.pathname === "/badge") return new Response(badgeSvg(await findSource(env, url.searchParams)), { headers: { "content-type": "image/svg+xml; charset=utf-8", "access-control-allow-origin": "*", "cache-control": "public, max-age=300" } });
     if (url.pathname === "/anchor/pending" && request.method === "GET") return j(await anchorPending(env));
+    if (url.pathname === "/a2a" && request.method === "GET") return j({ ok: true, transport: "A2A JSON-RPC (POST)", methods: ["SendMessage", "message/send"], agent_card: "/.well-known/agent-card.json", extensions: [CONDUCT_EXT_URI], input: "a URL or a publisher name as a text part; provenance and disclosure only" });
+    if (url.pathname === "/a2a" && request.method === "POST") return await handleA2A(request, env, JSON_HEADERS);
 
     if (url.pathname === "/admin/reverify_seed") { if (!adminOk(env, url)) return j({ ok: false, error: "forbidden" }, 403); return j(await adminReverifySeed(env)); }
     if (url.pathname === "/admin/retract") { if (!adminOk(env, url)) return j({ ok: false, error: "forbidden" }, 403); return j(await adminRetract(env, url)); }
 
     if (request.method === "POST") {
+      // 旧 card は url に root を書いとったので、root に来た A2A の message も受ける(SendMessage / message/send)。
+      const peek = request.clone();
       let msg; try { msg = await request.json(); } catch (e) { return j(rpcError(null, -32700, "parse error"), 400); }
+      if (msg && (msg.method === "SendMessage" || msg.method === "message/send")) return await handleA2A(peek, env, JSON_HEADERS);
       try { return j(await handleRpc(msg, env)); } catch (e) { return j(rpcError(msg && msg.id !== undefined ? msg.id : null, -32603, "internal: " + (e && e.message)), 500); }
     }
 
-    return j({ server: "hs-femtech-mcp", version: VERSION, description: "中立のフェム情報源 検証レジストリ。診断・推奨・効能なし。 / Neutral femtech source-verification registry.", endpoints: ["POST / (MCP JSON-RPC)", "GET /health", "GET /self", "GET /llms.txt", "GET /.well-known/agent-card.json", "GET /registry", "GET /checker", "GET /start", "GET /check-source?url=...", "GET /badge?url=...", "GET /anchor/pending"], topics: ["menstruation", "pms", "menopause"], disclaimer: DISCLAIMER });
+    return j({ server: "hs-femtech-mcp", version: VERSION, description: "中立のフェム情報源 検証レジストリ。診断・推奨・効能なし。 / Neutral femtech source-verification registry.", endpoints: ["POST / (MCP JSON-RPC)", "POST /a2a (A2A SendMessage / message/send)", "GET /health", "GET /self", "GET /llms.txt", "GET /.well-known/agent-card.json", "GET /.well-known/jwks.json", "GET /registry", "GET /checker", "GET /start", "GET /check-source?url=...", "GET /badge?url=...", "GET /anchor/pending"], topics: ["menstruation", "pms", "menopause"], disclaimer: DISCLAIMER });
   }
 };
 
