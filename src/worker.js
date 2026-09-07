@@ -715,6 +715,26 @@ async function findSource(env, q) {
 }
 
 // ---- 公開ページ: はじめてのフェム / Start Here (beginner guide, Plum, bilingual) ----
+// 2026-09-08: /start の情報源一覧は HTML に直書きで、3本ずつ9本だった。REGISTRY は11本(更年期5)。
+//   表示がデータを見ていないと、登録を増やしても入口は古いまま止まる。ここは REGISTRY から描く。
+//   verified 以外(pending)は出さない。人に見せるのは確かめ終わったものだけ。
+function startTopicCards() {
+  const order = [["menstruation", "t_mens", "Menstruation"], ["pms", "t_pms", "PMS"], ["menopause", "t_meno", "Menopause"]];
+  const esc = (x) => String(x == null ? "" : x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const isHttp = (u) => /^https:\/\//.test(String(u || ""));
+  let out = "";
+  for (const [topic, key, label] of order) {
+    const rows = REGISTRY.filter((r) => r && r.topic === topic && r.kind === "source" && isHttp(r.evidence_url));
+    if (!rows.length) continue;
+    out += '  <div class="topic"><h3 data-i18n="' + key + '">' + label + '</h3><ul class="src">\n';
+    for (const r of rows) {
+      out += '    <li><a href="' + esc(r.evidence_url) + '" target="_blank" rel="noopener">' + esc(r.publisher) + '</a><span class="jz">' + esc(r.jurisdiction) + '</span></li>\n';
+    }
+    out += '  </ul></div>\n';
+  }
+  return out;
+}
+
 function startPage() {
   return `<!doctype html>
 <html lang="en"><head>
@@ -777,21 +797,7 @@ function startPage() {
   <h2 data-i18n="s3t">Trusted places to start</h2>
   <p data-i18n="s3b">These are public bodies and medical societies. They publish general information with their name on it. Always general information, never a diagnosis.</p>
 
-  <div class="topic"><h3 data-i18n="t_mens">Menstruation</h3><ul class="src">
-    <li><a href="https://www.jsog.or.jp/" target="_blank" rel="noopener">Japan Society of Obstetrics and Gynecology (JSOG)</a><span class="jz">JP</span></li>
-    <li><a href="https://w-health.jp/" target="_blank" rel="noopener">MHLW Women's Health Care Lab</a><span class="jz">JP</span></li>
-    <li><a href="https://womenshealth.gov/menstrual-cycle" target="_blank" rel="noopener">Office on Women's Health</a><span class="jz">US</span></li>
-  </ul></div>
-  <div class="topic"><h3 data-i18n="t_pms">PMS</h3><ul class="src">
-    <li><a href="https://www.jmwh.jp/" target="_blank" rel="noopener">Japan Society for Menopause and Women's Health (JMWH)</a><span class="jz">JP</span></li>
-    <li><a href="https://www.acog.org/" target="_blank" rel="noopener">American College of Obstetricians and Gynecologists (ACOG)</a><span class="jz">US</span></li>
-    <li><a href="https://www.nhs.uk/conditions/pre-menstrual-syndrome/" target="_blank" rel="noopener">NHS</a><span class="jz">GB</span></li>
-  </ul></div>
-  <div class="topic"><h3 data-i18n="t_meno">Menopause</h3><ul class="src">
-    <li><a href="https://www.jmwh.jp/" target="_blank" rel="noopener">Japan Society for Menopause and Women's Health (JMWH)</a><span class="jz">JP</span></li>
-    <li><a href="https://www.menopause.org/" target="_blank" rel="noopener">The Menopause Society</a><span class="jz">US</span></li>
-    <li><a href="https://www.nhs.uk/conditions/menopause/" target="_blank" rel="noopener">NHS</a><span class="jz">GB</span></li>
-  </ul></div>
+${startTopicCards()}
 
   <div class="callout"><p data-i18n="isnt">The HORIZON SHIELD Femtech Registry checks who is behind a source. It does not diagnose, does not recommend products, and does not take referral fees. For symptoms or treatment, please consult a healthcare professional.</p></div>
 
