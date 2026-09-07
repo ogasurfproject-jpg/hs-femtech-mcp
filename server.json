@@ -1,10 +1,10 @@
 {
   "name": "io.github.ogasurfproject-jpg/hs-femtech-mcp",
   "description": "Neutral verification registry for femtech (women's health) information sources. Indexes sources by provenance, authority tier, jurisdiction, and machine-readable compensation disclosure with re-computable SHA-256. No diagnosis, no efficacy claims, no product endorsement, no referral fees.",
-  "version": "0.3.0",
+  "version": "0.4.1",
   "websiteUrl": "https://shield.the-horizons-innovation.com/",
   "repository": {
-    "url": "https://github.com/ogasurfproject-jpg/horizon-shield",
+    "url": "https://github.com/ogasurfproject-jpg/hs-femtech-mcp",
     "source": "github"
   },
   "remotes": [
@@ -18,6 +18,6 @@
     "agent_card": "https://femtech.horizonshield.dev/.well-known/agent-card.json",
     "llms_txt": "https://femtech.horizonshield.dev/llms.txt",
     "compensation": { "paid_by": "none", "referral_fee": false, "listing_fee": false },
-    "note": "MCPレジストリの現行スキーマに合わせて微調整して提出(hs-mcpと同じ要領)。ツール名は tools/list の8本と一致させる。"
+    "note": "MCPレジストリの現行スキーマに合わせて微調整して提出(hs-mcpと同じ要領)。ツール名は tools/list の9本と一致させる(check_source を含む)。"
   }
 }

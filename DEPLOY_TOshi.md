@@ -67,7 +67,7 @@ curl -s "$BASE/anchor/pending" | python3 -m json.tool
 ## 6. 発見配線(AIに引かせる)
 
 - `/llms.txt` が本番で出ることを確認(フロントLLM向けの中立宣言＋エンドポイント＋論点)。
-- `server.json` を MCPレジストリに提出(hs-mcp と同じ要領。現行スキーマに合わせて微調整、ツール名は tools/list の8本と一致)。
+- `server.json` を MCPレジストリに提出(hs-mcp と同じ要領。現行スキーマに合わせて微調整、ツール名は tools/list の9本と一致)。
 - shield サイトの llms.txt / sitemap から この worker の /llms.txt と agent-card にリンクを張ると発見されやすい(任意)。
 
 ## 番人メモ / 未実装(意図的)

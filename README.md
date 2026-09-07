@@ -1,4 +1,4 @@
-![HORIZON SHIELD Femtech Registry — neutral, verifiable registry of femtech information sources. MCP and A2A. No diagnosis, no referral fees.](./banner.jpg)
+![HORIZON SHIELD Femtech Registry: neutral, verifiable registry of femtech information sources. MCP and A2A. No diagnosis, no referral fees.](./banner.jpg)
 
 # HORIZON SHIELD Femtech Registry
 
@@ -129,6 +129,18 @@ Agent discovery: `GET /.well-known/agent-card.json` (A2A) and `GET /llms.txt` (f
 | `explain_product_category` | yes | product *category* explainer, no brand, no efficacy |
 | `how_to_verify` | yes | reproduce the hash yourself |
 | `get_agent_card` | yes | A2A card with compensation disclosure |
+| `check_source` | yes | is this URL or publisher a verified source here: who, authority tier, jurisdiction, disclosure; unverified is not untrustworthy |
+
+## Run locally over stdio
+
+`stdio.js` runs the same `src/worker.js` in-process as a stdio MCP server (one JSON-RPC message per line). Registry crawlers such as Glama use it through the `Dockerfile`. Without the `FEMTECH_KV` binding the server runs in its documented volatile mode: tool names and schemas are the same nine the live endpoint advertises, `register_source` results are not persisted. JSON-RPC notifications (`notifications/initialized` and friends) get no reply, as the spec requires.
+
+```sh
+printf '%s\n%s\n%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"you","version":"0"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | node stdio.js
+```
 
 ## Verifiability
 

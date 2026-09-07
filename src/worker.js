@@ -19,7 +19,7 @@
 //
 // 番人ルール: secret/deploy/push/production-curl は TOshi の手。
 
-const VERSION = "0.4.0";
+const VERSION = "0.4.1"; // 0.4.1 (2026-09-07): JSON-RPC notifications get no reply (202 / silent on stdio); package.json, server.json aligned to this value
 
 const DISCLAIMER =
   "本サービスは一般的な情報源の検証と提示のみを行い、診断・治療・特定商品の推奨は行いません。" +
@@ -467,6 +467,8 @@ async function handleA2A(request, env, headersBase) {
 // ---- MCP JSON-RPC ----
 function rpcResult(id, result) { return { jsonrpc: "2.0", id, result }; }
 function rpcError(id, code, message) { return { jsonrpc: "2.0", id, error: { code, message } }; }
+// 通知 = method があって id が無い(JSON-RPC 2.0 §4.1)。応答してはならない。
+function isRpcNotification(m) { return !!m && typeof m === "object" && !Array.isArray(m) && typeof m.method === "string" && m.id === undefined; }
 async function handleRpc(msg, env) {
   const id = msg && msg.id !== undefined ? msg.id : null;
   const method = msg && msg.method;
@@ -897,6 +899,10 @@ export default {
       const peek = request.clone();
       let msg; try { msg = await request.json(); } catch (e) { return j(rpcError(null, -32700, "parse error"), 400); }
       if (msg && (msg.method === "SendMessage" || msg.method === "message/send")) return await handleA2A(peek, env, JSON_HEADERS);
+      // JSON-RPC 2.0 の通知(id 無し。MCP の notifications/initialized 等)には応答を返さない。
+      // Streamable HTTP の規約どおり 202 Accepted、本文なし(hs-mcp と同じ扱い)。
+      // 以前は -32601 "method not found" を id:null で返しとって、mcp-proxy 側が壊れとった(Glama の実行ログ 2026-09-07)。
+      if (isRpcNotification(msg)) return new Response(null, { status: 202, headers: JSON_HEADERS });
       try { return j(await handleRpc(msg, env)); } catch (e) { return j(rpcError(msg && msg.id !== undefined ? msg.id : null, -32603, "internal: " + (e && e.message)), 500); }
     }
 
@@ -904,4 +910,4 @@ export default {
   }
 };
 
-export const _internals = { TOOLS, REGISTRY, TOPICS, PRODUCT_CATEGORIES, AGENT_CARD, DISCLAIMER, SELF_CHECK, runTool, handleRpc, structuralChecks, tool_register_source, tool_verify_source, tool_get_femtech_topic, tool_get_agent_card, tool_list_registry, tool_get_registry_entry, tool_explain_product_category, tool_how_to_verify, tool_check_source, checkerPage, startPage, badgeSvg, findSource, selfCheck, adminReverifySeed, adminRetract, anchorPending, mergedRegistry, mergedEntry, kvPutEntry, llmsTxt, provenanceOf };
+export const _internals = { TOOLS, REGISTRY, TOPICS, PRODUCT_CATEGORIES, AGENT_CARD, DISCLAIMER, SELF_CHECK, runTool, handleRpc, isRpcNotification, structuralChecks, tool_register_source, tool_verify_source, tool_get_femtech_topic, tool_get_agent_card, tool_list_registry, tool_get_registry_entry, tool_explain_product_category, tool_how_to_verify, tool_check_source, checkerPage, startPage, badgeSvg, findSource, selfCheck, adminReverifySeed, adminRetract, anchorPending, mergedRegistry, mergedEntry, kvPutEntry, llmsTxt, provenanceOf };

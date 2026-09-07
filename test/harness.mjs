@@ -151,5 +151,34 @@ ok("badge findSource: 収録ドメインを引ける", !!fs1 && /ACOG/.test(fs1.
 const sp = W.startPage();
 ok("startPage: 二言語+診断否定+checker導線", /<!doctype html>/i.test(sp) && /New to femtech/.test(sp) && /はじめてのフェムテック/.test(sp) && /does not diagnose/.test(sp) && /診断はせず/.test(sp) && /href="\/checker"/.test(sp));
 
+// 28 JSON-RPC 通知(id 無し)には応答しない: HTTP は 202 本文なし、stdio は stdout に何も出さない(2026-09-07 Glama 実行ログの不具合)
+ok("isRpcNotification: method あり id 無しだけが通知", W.isRpcNotification({ jsonrpc: "2.0", method: "notifications/initialized" }) && !W.isRpcNotification({ jsonrpc: "2.0", id: 1, method: "ping" }) && !W.isRpcNotification({ jsonrpc: "2.0", id: null, method: "ping" }) && !W.isRpcNotification([{ method: "x" }]));
+const notifReq = new Request("http://localhost/", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) });
+const notifRes = await mod.default.fetch(notifReq, {}, { waitUntil() {} });
+ok("HTTP: notifications/initialized は 202 本文なし", notifRes.status === 202 && (await notifRes.text()) === "");
+const pingRes = await mod.default.fetch(new Request("http://localhost/", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 7, method: "ping" }) }), {}, { waitUntil() {} });
+ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 200 && (await pingRes.json()).id === 7);
+
+// 29 stdio アダプタ往復: initialize → notifications/initialized → tools/list で、stdout は 2 行(通知に応答しない)
+{
+  const { spawn } = await import("node:child_process");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const child = spawn(process.execPath, [path.join(here, "..", "stdio.js")], { stdio: ["pipe", "pipe", "pipe"] });
+  let out = "";
+  child.stdout.on("data", (d) => { out += d.toString(); });
+  child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "harness", version: "0" } } }) + "\n");
+  child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+  child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }) + "\n");
+  child.stdin.end();
+  await new Promise((r) => child.on("close", r));
+  const lines = out.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  ok("stdio: 3 メッセージ入力で応答は 2 行(通知に応答なし)", lines.length === 2);
+  ok("stdio: initialize の応答に serverInfo", lines[0] && lines[0].id === 1 && lines[0].result && lines[0].result.serverInfo && lines[0].result.serverInfo.name === "hs-femtech-mcp");
+  ok("stdio: tools/list が 9 本", lines[1] && lines[1].id === 2 && lines[1].result && Array.isArray(lines[1].result.tools) && lines[1].result.tools.length === 9);
+  ok("stdio: id:null のエラー応答が無い", !lines.some((l) => l.id === null && l.error));
+}
+
 console.log(`\n  ${pass} green / ${fail} red`);
 if (fail > 0) process.exit(1);

@@ -28,7 +28,11 @@ rl.on("line", (line) => {
   if (!text) return;
   queue = queue.then(async () => {
     let id = null;
-    try { const p = JSON.parse(text); if (p && p.id !== undefined) id = p.id; } catch (_e) {}
+    let parsed = null;
+    try { parsed = JSON.parse(text); if (parsed && parsed.id !== undefined) id = parsed.id; } catch (_e) {}
+    // 通知(method あり、id 無し: notifications/initialized 等)は JSON-RPC 2.0 の規約で応答禁止。
+    // 本体(src/worker.js)も 202 で返すが、stdout に何も書かんことをここでも保証する(mcp-proxy が id:null の応答で壊れた 2026-09-07)。
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.method === "string" && parsed.id === undefined) return;
     try {
       const req = new Request("http://localhost/", {
         method: "POST",
