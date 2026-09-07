@@ -30,15 +30,15 @@ const AUTHORITY_TIERS = ["A_public_or_academic", "B_medical_institution", "C_com
 // ---- seed: レジストリ(情報源)。status は pending 起点。KV導入後 register で verified 保存 ----
 const REGISTRY = [
   // 月経・PMS
-  { entry_id: "jsog_menstruation_ja", kind: "source", publisher: "日本産科婦人科学会 (JSOG)", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "menstruation", evidence_url: "https://www.jsog.or.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
-  { entry_id: "jmwh_pms_ja", kind: "source", publisher: "日本女性医学学会 (JMWH)", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "pms", evidence_url: "https://www.jmwh.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
-  { entry_id: "mhlw_healthcarelab_ja", kind: "source", publisher: "厚生労働省 女性の健康 ヘルスケアラボ", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "menstruation", evidence_url: "https://w-health.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
+  { entry_id: "jsog_menstruation_ja", kind: "source", publisher: "日本産科婦人科学会 (JSOG)", publisher_en: "Japan Society of Obstetrics and Gynecology (JSOG)", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "menstruation", evidence_url: "https://www.jsog.or.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
+  { entry_id: "jmwh_pms_ja", kind: "source", publisher: "日本女性医学学会 (JMWH)", publisher_en: "Japan Society for Menopause and Women's Health (JMWH)", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "pms", evidence_url: "https://www.jmwh.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
+  { entry_id: "mhlw_healthcarelab_ja", kind: "source", publisher: "厚生労働省 女性の健康 ヘルスケアラボ", publisher_en: "MHLW Women's Health Care Lab (Japan)", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "menstruation", evidence_url: "https://w-health.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
   { entry_id: "acog_pms_en", kind: "source", publisher: "American College of Obstetricians and Gynecologists (ACOG)", authority_tier: "A_public_or_academic", jurisdiction: "US", lang: "en", topic: "pms", evidence_url: "https://www.acog.org/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
   { entry_id: "nhs_pms_en", kind: "source", publisher: "NHS (United Kingdom)", authority_tier: "A_public_or_academic", jurisdiction: "GB", lang: "en", topic: "pms", evidence_url: "https://www.nhs.uk/conditions/pre-menstrual-syndrome/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
   { entry_id: "owh_menstruation_en", kind: "source", publisher: "Office on Women's Health (US HHS)", authority_tier: "A_public_or_academic", jurisdiction: "US", lang: "en", topic: "menstruation", evidence_url: "https://womenshealth.gov/menstrual-cycle", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
   // 更年期 (menopause) 2本目の論点
-  { entry_id: "jmwh_menopause_ja", kind: "source", publisher: "日本女性医学学会 (JMWH)", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "menopause", evidence_url: "https://www.jmwh.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
-  { entry_id: "mhlw_menopause_ja", kind: "source", publisher: "厚生労働省 女性の健康 ヘルスケアラボ", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "menopause", evidence_url: "https://w-health.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
+  { entry_id: "jmwh_menopause_ja", kind: "source", publisher: "日本女性医学学会 (JMWH)", publisher_en: "Japan Society for Menopause and Women's Health (JMWH)", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "menopause", evidence_url: "https://www.jmwh.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
+  { entry_id: "mhlw_menopause_ja", kind: "source", publisher: "厚生労働省 女性の健康 ヘルスケアラボ", publisher_en: "MHLW Women's Health Care Lab (Japan)", authority_tier: "A_public_or_academic", jurisdiction: "JP", lang: "ja", topic: "menopause", evidence_url: "https://w-health.jp/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
   { entry_id: "menopause_society_en", kind: "source", publisher: "The Menopause Society (US)", authority_tier: "A_public_or_academic", jurisdiction: "US", lang: "en", topic: "menopause", evidence_url: "https://www.menopause.org/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
   { entry_id: "nhs_menopause_en", kind: "source", publisher: "NHS (United Kingdom)", authority_tier: "A_public_or_academic", jurisdiction: "GB", lang: "en", topic: "menopause", evidence_url: "https://www.nhs.uk/conditions/menopause/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" },
   { entry_id: "acog_menopause_en", kind: "source", publisher: "American College of Obstetricians and Gynecologists (ACOG)", authority_tier: "A_public_or_academic", jurisdiction: "US", lang: "en", topic: "menopause", evidence_url: "https://www.acog.org/", compensation: { paid_by: "none", referral_fee: false, listing_fee: false }, status: "pending" }
@@ -728,7 +728,15 @@ function startTopicCards() {
     if (!rows.length) continue;
     out += '  <div class="topic"><h3 data-i18n="' + key + '">' + label + '</h3><ul class="src">\n';
     for (const r of rows) {
-      out += '    <li><a href="' + esc(r.evidence_url) + '" target="_blank" rel="noopener">' + esc(r.publisher) + '</a><span class="jz">' + esc(r.jurisdiction) + '</span></li>\n';
+      // 2026-09-08: publisher は日本語名で持っている。英語ページに日本語名だけを出すと、
+      //   海外の読み手には誰なのか読めない(厚生労働省の項は英字が一文字も無かった)。
+      //   両方を書き出し、ページの言語切替(setLang)がどちらを見せるか決める。
+      //   英語名を持たない収録元は、日本語名をそのまま両方に使う。嘘の訳を作らない。
+      const en = esc(r.publisher_en || r.publisher);
+      const ja = esc(r.publisher);
+      out += '    <li><a href="' + esc(r.evidence_url) + '" target="_blank" rel="noopener">'
+           + '<span class="nm-en">' + en + '</span><span class="nm-ja">' + ja + '</span>'
+           + '</a><span class="jz">' + esc(r.jurisdiction) + '</span></li>\n';
     }
     out += '  </ul></div>\n';
   }
@@ -762,6 +770,9 @@ function startPage() {
   .checks li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 15px;margin:8px 0;color:#4c434a}
   .checks li::before{counter-increment:s;content:counter(s);color:var(--plum);font-weight:800;margin-right:10px}
   .cta{display:inline-block;margin-top:16px;background:var(--plum);color:#fff;font-weight:700;font-size:16px;padding:13px 24px;border-radius:12px;text-decoration:none}
+  .nm-ja{display:none}
+  html[lang="ja"] .nm-en{display:none}
+  html[lang="ja"] .nm-ja{display:inline}
   .topic{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin:12px 0;box-shadow:var(--shadow)}
   .topic h3{margin:0 0 4px;font-size:17px;font-family:Georgia,'Noto Serif CJK JP',serif}
   .topic .src{margin:6px 0 0;padding:0;list-style:none}
@@ -817,6 +828,7 @@ ${startTopicCards()}
   function setLang(l){
     lang=l; document.documentElement.lang=l;
     document.querySelectorAll("[data-i18n]").forEach(function(el){ el.textContent=t(el.getAttribute("data-i18n")); });
+    document.documentElement.setAttribute("lang", l);
     document.getElementById("lang-en").className=(l==="en")?"on":"";
     document.getElementById("lang-ja").className=(l==="ja")?"on":"";
     var c=document.getElementById("checks"); c.innerHTML="";
