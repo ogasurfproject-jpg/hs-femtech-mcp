@@ -75,7 +75,11 @@ const CARD_SIGNATURE = {
   "jku": "https://femtech.horizonshield.dev/.well-known/jwks.json",
   "alg": "ES256",
   "protected": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpPU0UiLCJraWQiOiJocy0yMDI2LTA5Iiwiamt1IjoiaHR0cHM6Ly9mZW10ZWNoLmhvcml6b25zaGllbGQuZGV2Ly53ZWxsLWtub3duL2p3a3MuanNvbiJ9",
-  "signature": "06TIwoqqUswedWgLhnPkFXxG38XwpwoFaMDIdrJ0TJN0cewXgxQ7QZrWqUGCbrjr01qHuuMIU06r8JecSUkn1g",
+  "signature": "nEu0yZYsyA5NoBxmAXwXLYdDUArRSW8Ti80R3D6P-JL2hRNj8dwj-14rFsm2e2hXNGZegPvM-be6ghfGECZWXw",
+  "plain": {
+    "protected": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpPU0UiLCJraWQiOiJocy0yMDI2LTA5Iiwiamt1IjoiaHR0cHM6Ly9mZW10ZWNoLmhvcml6b25zaGllbGQuZGV2Ly53ZWxsLWtub3duL2p3a3MuanNvbiJ9",
+    "signature": "KTOzTUwMHg_vG-Jgnh-aIaD8eIeX3yq9yZgcnec_CEuaUmQm7iFdzpetQGrSSPadTOmdoKZI1GROC0I0TguC7w"
+  },
   "jwk": {
     "kty": "EC",
     "x": "CytwnuXFtXi7PFCcF-TCbvW5OgOg4KuWRLeRvdfHWLs",
@@ -85,14 +89,18 @@ const CARD_SIGNATURE = {
     "alg": "ES256",
     "use": "sig"
   },
-  "canonical_sha256": "8c98e665d5d21e48cdfd320c1552ae84754bae46dcb786f5a5d4fa2858d1073a"
+  "canonical_sha256": "66e31c322b1423801ffa342d13f4a00ebfad9076d87776c2f803b3701a27049d",
+  "jcs_sha256": "52e6aaf09c80eda1e40ba713810a5a0072434a6ef7e9d2fec88f7faab8e45d5e"
 };
 /* @@CARD_SIGNATURE_END */
 const CARD_CANONICAL_ORIGIN = "https://femtech.horizonshield.dev";
 function withCardSignature(card, origin) {
   if (!CARD_SIGNATURE || !CARD_SIGNATURE.protected || !CARD_SIGNATURE.signature) return card;
   if (String(origin || "").replace(/\/+$/, "") !== CARD_CANONICAL_ORIGIN) return card;
-  return Object.assign({}, card, { signatures: [{ protected: CARD_SIGNATURE.protected, signature: CARD_SIGNATURE.signature }] });
+  // 2026-10-02: 2 本目(素の RFC 8785、url と配る欄を全部覆う)も配る。他の 4 worker と同じ形。1 本だけやと SDK によって Invalid に見える。
+  const entries = [{ protected: CARD_SIGNATURE.protected, signature: CARD_SIGNATURE.signature }];
+  if (CARD_SIGNATURE.plain && CARD_SIGNATURE.plain.protected && CARD_SIGNATURE.plain.signature) entries.push({ protected: CARD_SIGNATURE.plain.protected, signature: CARD_SIGNATURE.plain.signature });
+  return Object.assign({}, card, { signatures: entries });
 }
 function jwksDocument() {
   return { keys: CARD_SIGNATURE && CARD_SIGNATURE.jwk ? [CARD_SIGNATURE.jwk] : [] };
