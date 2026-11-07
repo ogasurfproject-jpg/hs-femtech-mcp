@@ -180,5 +180,33 @@ ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 2
   ok("stdio: id:null のエラー応答が無い", !lines.some((l) => l.id === null && l.error));
 }
 
+// 30 GET / の頁(2026-11-07): Accept が text/html を好む時だけ HTML(title あり)、ほかは今までの JSON の byte のまま。
+// 名の無い path(/no-such-path)は同じ JSON を返し、この変更は触らないので、その byte を基準にする。どちらにも Vary: Accept。
+{
+  const get = async (path, accept, method = "GET") => {
+    const r = await mod.default.fetch(new Request("http://localhost" + path, { method, headers: accept === undefined ? {} : { accept } }), {}, { waitUntil() {} });
+    return { s: r.status, ct: r.headers.get("content-type") || "", vary: r.headers.get("vary"), body: await r.text() };
+  };
+  const ref = await get("/no-such-path");
+  const BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+  const jsonCases = [undefined, "", "*/*", "application/json", "application/json, text/html", "application/json;q=0.5, text/html", "text/html;q=0.5, application/json", "text/html;q=0, */*", "text/html;q=abc", "text/*", "application/json, text/event-stream, */*"];
+  let same = 0;
+  for (const a of jsonCases) { const r = await get("/", a); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === "Accept") same++; }
+  ok("GET /: Accept 無し、*/*、application/json が先などの " + jsonCases.length + " 通りは今までの JSON と byte まで同じ、Vary: Accept", same === jsonCases.length && ref.ct.startsWith("application/json") && ref.vary === null);
+  const fj = await get("/?format=json", BROWSER);
+  ok("GET /?format=json: browser の Accept でも JSON の byte のまま", fj.body === ref.body && fj.ct === ref.ct && fj.vary === "Accept");
+  const htmlCases = [BROWSER, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "text/html", "text/html, application/json", "TEXT/HTML;charset=utf-8, application/json;q=0.9", "application/json;q=0, text/html"];
+  let pages = 0;
+  for (const a of htmlCases) { const r = await get("/", a); if (r.s === 200 && r.ct === "text/html; charset=utf-8" && /<title>[^<]{10,}<\/title>/.test(r.body) && r.vary === "Accept") pages++; }
+  ok("GET /: browser と Bingbot の Accept、text/html が先などの " + htmlCases.length + " 通りは 200 text/html で title あり、Vary: Accept", pages === htmlCases.length);
+  const pg = (await get("/", BROWSER)).body;
+  const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  ok("GET / の頁: JSON そのものを載せ、JSON への link があり、noindex は無い", pg.includes("<pre>" + esc(ref.body) + "</pre>") && pg.includes('href="/?format=json"') && !/noindex/i.test(pg));
+  const hd = await get("/", BROWSER, "HEAD");
+  ok("HEAD /: browser の Accept で 200 text/html、本文なし", hd.s === 200 && hd.ct.startsWith("text/html") && hd.body === "");
+  const other = await get("/no-such-path", BROWSER);
+  ok("名の無い path は browser の Accept でも JSON のまま(頁にするのは / だけ)", other.ct.startsWith("application/json") && other.vary === null);
+}
+
 console.log(`\n  ${pass} green / ${fail} red`);
 if (fail > 0) process.exit(1);

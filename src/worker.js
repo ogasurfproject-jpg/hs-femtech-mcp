@@ -897,6 +897,65 @@ async function selfCheck(env) {
   return { server: "hs-femtech-mcp", version: VERSION, neutral: meetsCompensation, persistence: hasKV(env) ? "kv" : "none", compensation: AGENT_CARD.compensation, medical_authority_claimed: false, human_checker: "/checker", note: "中立の検証層。医療の権威を名乗らない。送客料・掲載料ゼロを宣言。" };
 }
 
+// GET / の頁(2026-11-07)。GET / は JSON を返すので、頁として読む crawler には title が無い。Accept が text/html を
+// 好む要求にだけ、同じ JSON を載せた小さな HTML(title、JSON そのもの、JSON への link)を返す。ほかの要求は今までの
+// JSON の byte のまま。どちらにも Vary: Accept を付ける。決まり(q は読む。q が無ければ 1、読めない q は 0、
+// ワイルドカードはどちらにも数えない): text/html が q > 0 で挙がり、application/json も q > 0 で挙がっている時は
+// html の q が json の q 以上で、かつ text/html が先に挙がっている時だけ HTML。Accept 無し、*/* だけ、
+// application/json が先、?format=json は JSON。
+function acceptPrefersHtml(accept) {
+  let html = null, json = null;
+  String(accept || "").split(",").forEach((part, i) => {
+    const bits = part.split(";").map((s) => s.trim());
+    const type = bits[0].toLowerCase();
+    if (type !== "text/html" && type !== "application/json") return;
+    let q = 1;
+    for (const b of bits.slice(1)) {
+      const m = /^q\s*=\s*(.*)$/i.exec(b);
+      if (m) { q = /^(0(\.\d{0,3})?|1(\.0{0,3})?)$/.test(m[1]) ? Number(m[1]) : 0; break; }
+    }
+    if (q <= 0) return;
+    if (type === "text/html") html = html ? { q: Math.max(html.q, q), i: html.i } : { q, i };
+    else json = json ? { q: Math.max(json.q, q), i: json.i } : { q, i };
+  });
+  if (!html) return false;
+  if (!json) return true;
+  return html.q >= json.q && html.i < json.i;
+}
+
+async function rootFace(request, url, res) {
+  if (url.pathname !== "/" || (request.method !== "GET" && request.method !== "HEAD")) return res;
+  const headers = new Headers(res.headers);
+  headers.append("vary", "Accept");
+  if (url.searchParams.get("format") === "json" || !acceptPrefersHtml(request.headers.get("accept")))
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+  const body = await res.text();
+  const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const page = `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hs-femtech-mcp: 中立のフェム情報源 検証レジストリ / Neutral femtech source-verification registry</title>
+<meta name="description" content="Neutral verification registry for femtech (women's health) information sources: provenance, authority tier, jurisdiction and compensation disclosure, with a recomputable SHA-256. No diagnosis, no efficacy claims, no product endorsement. This page shows the service document that GET / returns as JSON.">
+<link rel="alternate" type="application/json" href="/?format=json">
+<style>body{margin:0;padding:24px 16px;background:#0b0b0f;color:#e8e8ee;font:15px/1.6 -apple-system,"Helvetica Neue",Arial,sans-serif}main{max-width:960px;margin:0 auto}h1{font-size:22px;margin:0 0 8px}a{color:#7b7bff}pre{font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;border-top:1px solid #33334a;padding-top:12px}.k{font:12px ui-monospace,Menlo,monospace;color:#9a9ab0;text-transform:uppercase;letter-spacing:.08em}</style>
+</head>
+<body>
+<main>
+<div class="k">hs-femtech-mcp / femtech.horizonshield.dev</div>
+<h1>中立のフェム情報源 検証レジストリ / Neutral femtech source-verification registry</h1>
+<p>GET / が JSON で返すサービスの説明と同じ中身です。This is the service document that <code>GET /</code> returns as JSON. Machine-readable: <a href="/?format=json">/?format=json</a> (or send <code>Accept: application/json</code>). 初めての方は <a href="/start">/start</a>、出典の確かめは <a href="/checker">/checker</a>。</p>
+<pre>${esc(body)}</pre>
+</main>
+</body>
+</html>
+`;
+  headers.set("content-type", "text/html; charset=utf-8");
+  headers.delete("content-length");
+  return new Response(request.method === "HEAD" ? null : page, { status: res.status, headers });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -932,7 +991,7 @@ export default {
       try { return j(await handleRpc(msg, env)); } catch (e) { return j(rpcError(msg && msg.id !== undefined ? msg.id : null, -32603, "internal: " + (e && e.message)), 500); }
     }
 
-    return j({ server: "hs-femtech-mcp", version: VERSION, description: "中立のフェム情報源 検証レジストリ。診断・推奨・効能なし。 / Neutral femtech source-verification registry.", endpoints: ["POST / (MCP JSON-RPC)", "POST /a2a (A2A SendMessage / message/send)", "GET /health", "GET /self", "GET /llms.txt", "GET /.well-known/agent-card.json", "GET /.well-known/jwks.json", "GET /registry", "GET /checker", "GET /start", "GET /check-source?url=...", "GET /badge?url=...", "GET /anchor/pending"], topics: ["menstruation", "pms", "menopause"], disclaimer: DISCLAIMER });
+    return rootFace(request, url, j({ server: "hs-femtech-mcp", version: VERSION, description: "中立のフェム情報源 検証レジストリ。診断・推奨・効能なし。 / Neutral femtech source-verification registry.", endpoints: ["POST / (MCP JSON-RPC)", "POST /a2a (A2A SendMessage / message/send)", "GET /health", "GET /self", "GET /llms.txt", "GET /.well-known/agent-card.json", "GET /.well-known/jwks.json", "GET /registry", "GET /checker", "GET /start", "GET /check-source?url=...", "GET /badge?url=...", "GET /anchor/pending"], topics: ["menstruation", "pms", "menopause"], disclaimer: DISCLAIMER }));
   }
 };
 
