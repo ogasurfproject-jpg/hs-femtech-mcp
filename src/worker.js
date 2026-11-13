@@ -923,11 +923,36 @@ function acceptPrefersHtml(accept) {
   return html.q >= json.q && html.i < json.i;
 }
 
+// 2026-11-13: crawler は text/html を頼まない回がある。Bing の URL の検査は 4 分の間に / を 3 回取り、頁を 1 回、
+// JSON を 2 回受け取り、「Missing Title Tag」が消えなかった。Accept が text/html も JSON の型も text/event-stream も
+// 挙げていない要求(Accept 無し、空、*/*、text/*)には、browser か crawler からの時にも頁を返す: User-Agent が
+// Mozilla/ で始まるか、bot、crawl、spider、slurp、preview を含み、Sec-Fetch-Mode が無いか navigate の時
+// (browser の中の script の fetch は cors や same-origin と名乗るので JSON のまま)。curl、Python、Node、Go、
+// MCP の client はその User-Agent を送らないか JSON を挙げるので、今までの JSON の byte のまま。
+// Accept が text/html を挙げている要求は、今までどおり acceptPrefersHtml だけで決まる。
+// どちらの答えにも Vary: Accept, User-Agent, Sec-Fetch-Mode。
+const ROOT_PAGE_UA = /^mozilla\/|bot|crawl|spider|slurp|preview/i;
+function acceptNamesHtmlOrMachine(accept) {
+  return String(accept || "").split(",").some((part) => {
+    const type = part.split(";")[0].trim().toLowerCase();
+    return type === "text/html" || type === "text/event-stream" || type.includes("json");
+  });
+}
+function rootWantsHtml(request, url) {
+  if (url.searchParams.get("format") === "json") return false;
+  const accept = request.headers.get("accept");
+  if (acceptPrefersHtml(accept)) return true;
+  if (acceptNamesHtmlOrMachine(accept)) return false;
+  const mode = (request.headers.get("sec-fetch-mode") || "").trim().toLowerCase();
+  if (mode && mode !== "navigate") return false;
+  return ROOT_PAGE_UA.test(request.headers.get("user-agent") || "");
+}
+
 async function rootFace(request, url, res) {
   if (url.pathname !== "/" || (request.method !== "GET" && request.method !== "HEAD")) return res;
   const headers = new Headers(res.headers);
-  headers.append("vary", "Accept");
-  if (url.searchParams.get("format") === "json" || !acceptPrefersHtml(request.headers.get("accept")))
+  headers.append("vary", "Accept, User-Agent, Sec-Fetch-Mode");
+  if (!rootWantsHtml(request, url))
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   const body = await res.text();
   const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -937,7 +962,7 @@ async function rootFace(request, url, res) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hs-femtech-mcp: 中立のフェム情報源 検証レジストリ / Neutral femtech source-verification registry</title>
-<meta name="description" content="Neutral verification registry for femtech (women's health) information sources: provenance, authority tier, jurisdiction and compensation disclosure, with a recomputable SHA-256. No diagnosis, no efficacy claims, no product endorsement. This page shows the service document that GET / returns as JSON.">
+<meta name="description" content="Neutral verification registry for femtech (women's health) information sources: provenance, authority tier and compensation disclosure. No diagnosis.">
 <link rel="alternate" type="application/json" href="/?format=json">
 <style>body{margin:0;padding:24px 16px;background:#0b0b0f;color:#e8e8ee;font:15px/1.6 -apple-system,"Helvetica Neue",Arial,sans-serif}main{max-width:960px;margin:0 auto}h1{font-size:22px;margin:0 0 8px}a{color:#7b7bff}pre{font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;border-top:1px solid #33334a;padding-top:12px}.k{font:12px ui-monospace,Menlo,monospace;color:#9a9ab0;text-transform:uppercase;letter-spacing:.08em}</style>
 </head>

@@ -181,24 +181,27 @@ ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 2
 }
 
 // 30 GET / の頁(2026-11-07): Accept が text/html を好む時だけ HTML(title あり)、ほかは今までの JSON の byte のまま。
-// 名の無い path(/no-such-path)は同じ JSON を返し、この変更は触らないので、その byte を基準にする。どちらにも Vary: Accept。
+// 名の無い path(/no-such-path)は同じ JSON を返し、この変更は触らないので、その byte を基準にする。
+// 2026-11-13: Accept が text/html も JSON の型も text/event-stream も挙げていない要求は、browser か crawler の
+// User-Agent で、script の fetch でない時にも頁。どちらにも Vary: Accept, User-Agent, Sec-Fetch-Mode。
 {
-  const get = async (path, accept, method = "GET") => {
-    const r = await mod.default.fetch(new Request("http://localhost" + path, { method, headers: accept === undefined ? {} : { accept } }), {}, { waitUntil() {} });
+  const VARY = "Accept, User-Agent, Sec-Fetch-Mode";
+  const get = async (path, accept, method = "GET", more = {}) => {
+    const r = await mod.default.fetch(new Request("http://localhost" + path, { method, headers: accept === undefined ? { ...more } : { accept, ...more } }), {}, { waitUntil() {} });
     return { s: r.status, ct: r.headers.get("content-type") || "", vary: r.headers.get("vary"), body: await r.text() };
   };
   const ref = await get("/no-such-path");
   const BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
   const jsonCases = [undefined, "", "*/*", "application/json", "application/json, text/html", "application/json;q=0.5, text/html", "text/html;q=0.5, application/json", "text/html;q=0, */*", "text/html;q=abc", "text/*", "application/json, text/event-stream, */*"];
   let same = 0;
-  for (const a of jsonCases) { const r = await get("/", a); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === "Accept") same++; }
-  ok("GET /: Accept 無し、*/*、application/json が先などの " + jsonCases.length + " 通りは今までの JSON と byte まで同じ、Vary: Accept", same === jsonCases.length && ref.ct.startsWith("application/json") && ref.vary === null);
+  for (const a of jsonCases) { const r = await get("/", a); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === VARY) same++; }
+  ok("GET /: Accept 無し、*/*、application/json が先などの " + jsonCases.length + " 通りは今までの JSON と byte まで同じ、Vary は 3 つ", same === jsonCases.length && ref.ct.startsWith("application/json") && ref.vary === null);
   const fj = await get("/?format=json", BROWSER);
-  ok("GET /?format=json: browser の Accept でも JSON の byte のまま", fj.body === ref.body && fj.ct === ref.ct && fj.vary === "Accept");
+  ok("GET /?format=json: browser の Accept でも JSON の byte のまま", fj.body === ref.body && fj.ct === ref.ct && fj.vary === VARY);
   const htmlCases = [BROWSER, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "text/html", "text/html, application/json", "TEXT/HTML;charset=utf-8, application/json;q=0.9", "application/json;q=0, text/html"];
   let pages = 0;
-  for (const a of htmlCases) { const r = await get("/", a); if (r.s === 200 && r.ct === "text/html; charset=utf-8" && /<title>[^<]{10,}<\/title>/.test(r.body) && r.vary === "Accept") pages++; }
-  ok("GET /: browser と Bingbot の Accept、text/html が先などの " + htmlCases.length + " 通りは 200 text/html で title あり、Vary: Accept", pages === htmlCases.length);
+  for (const a of htmlCases) { const r = await get("/", a); if (r.s === 200 && r.ct === "text/html; charset=utf-8" && /<title>[^<]{10,}<\/title>/.test(r.body) && r.vary === VARY) pages++; }
+  ok("GET /: browser と Bingbot の Accept、text/html が先などの " + htmlCases.length + " 通りは 200 text/html で title あり、Vary は 3 つ", pages === htmlCases.length);
   const pg = (await get("/", BROWSER)).body;
   const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   ok("GET / の頁: JSON そのものを載せ、JSON への link があり、noindex は無い", pg.includes("<pre>" + esc(ref.body) + "</pre>") && pg.includes('href="/?format=json"') && !/noindex/i.test(pg));
@@ -206,6 +209,37 @@ ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 2
   ok("HEAD /: browser の Accept で 200 text/html、本文なし", hd.s === 200 && hd.ct.startsWith("text/html") && hd.body === "");
   const other = await get("/no-such-path", BROWSER);
   ok("名の無い path は browser の Accept でも JSON のまま(頁にするのは / だけ)", other.ct.startsWith("application/json") && other.vary === null);
+
+  // 2026-11-13: text/html を頼まない browser と crawler にも頁。
+  const BING = "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/116.0.1938.76 Safari/537.36";
+  const CHROME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+  const crawlers = [BING, "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0 Safari/537.36 BingPreview/1.0b", CHROME, "MOZILLA/5.0 (compatible; SomeCrawler/1.0)"];
+  const open = [undefined, "", "*/*", "text/*", "image/*, */*;q=0.5"];
+  let bp = 0;
+  for (const ua of crawlers) for (const a of open) { const r = await get("/", a, "GET", { "user-agent": ua }); if (r.s === 200 && r.ct === "text/html; charset=utf-8" && /<title>[^<]{10,}<\/title>/.test(r.body) && r.vary === VARY) bp++; }
+  ok("GET /: browser か crawler の User-Agent で、Accept 無し、空、*/*、text/*、image/* の 35 通りは頁(title あり)", bp === 35);
+  const machines = [undefined, "", "curl/8.7.1", "python-requests/2.32.3", "Python-urllib/3.13", "node", "undici", "Go-http-client/2.0", "axios/1.7.7", "nenrin-verify/0.6.0", "okhttp/4.12.0", "Wget/1.21.4", "glama-inspector/1", "mcp-client/1.0"];
+  let mj = 0;
+  for (const ua of machines) for (const a of open) { const r = await get("/", a, "GET", ua === undefined ? {} : { "user-agent": ua }); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === VARY) mj++; }
+  ok("GET /: program の User-Agent(curl、Python、Node、Go、MCP の client)か無しの 70 通りは今までの JSON と byte まで同じ", mj === 70);
+  const named = ["application/json", "application/json, text/event-stream, */*", "text/event-stream", "application/ld+json, */*", "APPLICATION/JSON;q=0.1, */*", "application/json, text/html", "text/html;q=0, */*", "text/html;q=abc", "text/html;q=0.5, application/json"];
+  let nj = 0;
+  for (const a of named) for (const ua of [BING, CHROME]) { const r = await get("/", a, "GET", { "user-agent": ua }); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === VARY) nj++; }
+  ok("GET /: bingbot や browser でも、JSON か event-stream を挙げた要求、text/html が今まで勝たなかった要求の 18 通りは JSON のまま", nj === 18);
+  let sc = 0;
+  for (const mode of ["cors", "same-origin", "no-cors", "websocket", "CORS"]) for (const a of [undefined, "*/*"]) { const r = await get("/", a, "GET", { "user-agent": CHROME, "sec-fetch-mode": mode }); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === VARY) sc++; }
+  ok("GET /: browser の中の script の fetch(Sec-Fetch-Mode が cors、same-origin、no-cors、websocket)の 10 通りは JSON のまま", sc === 10);
+  let nv = 0;
+  for (const mode of ["navigate", "NAVIGATE", " navigate "]) { const r = await get("/", "*/*", "GET", { "user-agent": CHROME, "sec-fetch-mode": mode }); if (r.ct === "text/html; charset=utf-8" && r.vary === VARY) nv++; }
+  const ch = await get("/", BROWSER, "GET", { "user-agent": CHROME, "sec-fetch-mode": "cors" });
+  ok("GET /: Sec-Fetch-Mode が navigate なら */* でも頁。text/html を好む Accept は cors でも頁(11-07 の決まりは狭めない)", nv === 3 && ch.ct === "text/html; charset=utf-8");
+  const fjb = await get("/?format=json", "*/*", "GET", { "user-agent": BING });
+  const hdb = await get("/", "*/*", "HEAD", { "user-agent": BING });
+  const otb = await get("/no-such-path", "*/*", "GET", { "user-agent": BING });
+  const pgb = (await get("/", "*/*", "GET", { "user-agent": BING })).body;
+  ok("bingbot の */*: ?format=json は JSON、HEAD は text/html で本文なし、名の無い path は触らない、頁は browser の頁と byte まで同じ", fjb.body === ref.body && fjb.ct === ref.ct && hdb.s === 200 && hdb.ct.startsWith("text/html") && hdb.body === "" && otb.ct.startsWith("application/json") && otb.vary === null && pgb === pg);
+  const desc = (/<meta name="description" content="([^"]*)">/.exec(pg) || [])[1] || "";
+  ok("GET / の頁: meta description は 25〜160 字、h1 は 1 つ、lang あり", desc.length >= 25 && desc.length <= 160 && (pg.match(/<h1>/g) || []).length === 1 && /<html lang="[a-z]{2}">/.test(pg));
 }
 
 console.log(`\n  ${pass} green / ${fail} red`);
