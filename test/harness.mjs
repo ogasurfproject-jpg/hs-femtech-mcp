@@ -240,6 +240,9 @@ ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 2
   ok("bingbot の */*: ?format=json は JSON、HEAD は text/html で本文なし、名の無い path は触らない、頁は browser の頁と byte まで同じ", fjb.body === ref.body && fjb.ct === ref.ct && hdb.s === 200 && hdb.ct.startsWith("text/html") && hdb.body === "" && otb.ct.startsWith("application/json") && otb.vary === null && pgb === pg);
   const desc = (/<meta name="description" content="([^"]*)">/.exec(pg) || [])[1] || "";
   ok("GET / の頁: meta description は 25〜160 字、h1 は 1 つ、lang あり", desc.length >= 25 && desc.length <= 160 && (pg.match(/<h1>/g) || []).length === 1 && /<html lang="[a-z]{2}">/.test(pg));
+  // 2026-11-13: Bing は 70 字より長い title を Title too long と数える。
+  const ttl = (/<title>([^<]*)<\/title>/.exec(pg) || [])[1] || "";
+  ok("GET / の頁: title は 10〜69 字(Bing の Title too long は 70 字より長い title)、hs-femtech-mcp: で始まる", [...ttl].length >= 10 && [...ttl].length <= 69 && ttl.startsWith("hs-femtech-mcp: "));
 }
 
 console.log(`\n  ${pass} green / ${fail} red`);

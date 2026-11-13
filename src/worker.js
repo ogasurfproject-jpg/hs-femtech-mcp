@@ -961,7 +961,7 @@ async function rootFace(request, url, res) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>hs-femtech-mcp: 中立のフェム情報源 検証レジストリ / Neutral femtech source-verification registry</title>
+<title>hs-femtech-mcp: Neutral femtech source-verification registry</title>
 <meta name="description" content="Neutral verification registry for femtech (women's health) information sources: provenance, authority tier and compensation disclosure. No diagnosis.">
 <link rel="alternate" type="application/json" href="/?format=json">
 <style>body{margin:0;padding:24px 16px;background:#0b0b0f;color:#e8e8ee;font:15px/1.6 -apple-system,"Helvetica Neue",Arial,sans-serif}main{max-width:960px;margin:0 auto}h1{font-size:22px;margin:0 0 8px}a{color:#7b7bff}pre{font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;border-top:1px solid #33334a;padding-top:12px}.k{font:12px ui-monospace,Menlo,monospace;color:#9a9ab0;text-transform:uppercase;letter-spacing:.08em}</style>
