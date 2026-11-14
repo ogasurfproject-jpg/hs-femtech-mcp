@@ -218,10 +218,10 @@ ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 2
   let bp = 0;
   for (const ua of crawlers) for (const a of open) { const r = await get("/", a, "GET", { "user-agent": ua }); if (r.s === 200 && r.ct === "text/html; charset=utf-8" && /<title>[^<]{10,}<\/title>/.test(r.body) && r.vary === VARY) bp++; }
   ok("GET /: browser か crawler の User-Agent で、Accept 無し、空、*/*、text/*、image/* の 35 通りは頁(title あり)", bp === 35);
-  const machines = [undefined, "", "curl/8.7.1", "python-requests/2.32.3", "Python-urllib/3.13", "node", "undici", "Go-http-client/2.0", "axios/1.7.7", "nenrin-verify/0.6.0", "okhttp/4.12.0", "Wget/1.21.4", "glama-inspector/1", "mcp-client/1.0"];
+  const machines = [undefined, "", "curl/8.7.1", "python-requests/2.32.3", "Python-urllib/3.13", "node", "undici", "Go-http-client/2.0", "axios/1.7.7", "nenrin-verify/0.6.0", "okhttp/4.12.0", "Wget/1.21.4", "glama-inspector/1", "mcp-client/1.0", "Mozilla/5.0 (Macintosh; Darwin 25.3.0; en-US) PowerShell/7.4.6", "Boto3/1.35.10 md/Botocore#1.35.10 ua/2.0 os/macos#25.3.0 lang/python#3.12.7", "Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)", "python-requests/2.32.3 robotics-lab"];
   let mj = 0;
   for (const ua of machines) for (const a of open) { const r = await get("/", a, "GET", ua === undefined ? {} : { "user-agent": ua }); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === VARY) mj++; }
-  ok("GET /: program の User-Agent(curl、Python、Node、Go、MCP の client)か無しの 70 通りは今までの JSON と byte まで同じ", mj === 70);
+  ok("GET /: program の User-Agent(curl、Python、Node、Go、MCP の client)か無しの 90 通り(PowerShell、Boto3、UptimeRobot、robotics を含む)は今までの JSON と byte まで同じ", mj === 90);
   const named = ["application/json", "application/json, text/event-stream, */*", "text/event-stream", "application/ld+json, */*", "APPLICATION/JSON;q=0.1, */*", "application/json, text/html", "text/html;q=0, */*", "text/html;q=abc", "text/html;q=0.5, application/json"];
   let nj = 0;
   for (const a of named) for (const ua of [BING, CHROME]) { const r = await get("/", a, "GET", { "user-agent": ua }); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === VARY) nj++; }
