@@ -181,7 +181,7 @@ ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 2
 }
 
 // 30 GET / の頁(2026-11-07): Accept が text/html を好む時だけ HTML(title あり)、ほかは今までの JSON の byte のまま。
-// 名の無い path(/no-such-path)は同じ JSON を返し、この変更は触らないので、その byte を基準にする。
+// 基準の byte は /?format=json(2026-11-19 までは名の無い path の JSON を基準にしていた。名の無い path は 404 になった)。
 // 2026-11-13: Accept が text/html も JSON の型も text/event-stream も挙げていない要求は、browser か crawler の
 // User-Agent で、script の fetch でない時にも頁。どちらにも Vary: Accept, User-Agent, Sec-Fetch-Mode。
 {
@@ -190,12 +190,12 @@ ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 2
     const r = await mod.default.fetch(new Request("http://localhost" + path, { method, headers: accept === undefined ? { ...more } : { accept, ...more } }), {}, { waitUntil() {} });
     return { s: r.status, ct: r.headers.get("content-type") || "", vary: r.headers.get("vary"), body: await r.text() };
   };
-  const ref = await get("/no-such-path");
+  const ref = await get("/?format=json");
   const BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
   const jsonCases = [undefined, "", "*/*", "application/json", "application/json, text/html", "application/json;q=0.5, text/html", "text/html;q=0.5, application/json", "text/html;q=0, */*", "text/html;q=abc", "text/*", "application/json, text/event-stream, */*"];
   let same = 0;
   for (const a of jsonCases) { const r = await get("/", a); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === VARY) same++; }
-  ok("GET /: Accept 無し、*/*、application/json が先などの " + jsonCases.length + " 通りは今までの JSON と byte まで同じ、Vary は 3 つ", same === jsonCases.length && ref.ct.startsWith("application/json") && ref.vary === null);
+  ok("GET /: Accept 無し、*/*、application/json が先などの " + jsonCases.length + " 通りは今までの JSON と byte まで同じ、Vary は 3 つ", same === jsonCases.length && ref.ct.startsWith("application/json") && ref.vary === VARY);
   const fj = await get("/?format=json", BROWSER);
   ok("GET /?format=json: browser の Accept でも JSON の byte のまま", fj.body === ref.body && fj.ct === ref.ct && fj.vary === VARY);
   const htmlCases = [BROWSER, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "text/html", "text/html, application/json", "TEXT/HTML;charset=utf-8, application/json;q=0.9", "application/json;q=0, text/html"];
@@ -243,6 +243,78 @@ ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 2
   // 2026-11-13: Bing は 70 字より長い title を Title too long と数える。
   const ttl = (/<title>([^<]*)<\/title>/.exec(pg) || [])[1] || "";
   ok("GET / の頁: title は 10〜69 字(Bing の Title too long は 70 字より長い title)、hs-femtech-mcp: で始まる", [...ttl].length >= 10 && [...ttl].length <= 69 && ttl.startsWith("hs-femtech-mcp: "));
+}
+
+// 31 bot の GET /、robots.txt と sitemap.xml、名の無い GET と HEAD の path は 404(2026-11-19)
+{
+  const VARY = "Accept, User-Agent, Sec-Fetch-Mode";
+  const req = (path, { method = "GET", accept, ua, body, host = "https://femtech.horizonshield.dev" } = {}) => {
+    const h = {}; if (accept !== undefined) h.accept = accept; if (ua !== undefined) h["user-agent"] = ua; if (body !== undefined) h["content-type"] = "application/json";
+    return mod.default.fetch(new Request(host + path, { method, headers: h, body }), {}, { waitUntil() {} });
+  };
+  const get = async (path, o) => { const r = await req(path, o); return { s: r.status, ct: r.headers.get("content-type") || "", vary: r.headers.get("vary"), body: await r.text() }; };
+  const ref = await get("/?format=json");
+  const BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+  const pg = (await get("/", { accept: BROWSER })).body;
+  const bots = ["Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/116.0.1938.76 Safari/537.36", "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.204 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "Googlebot/2.1 (+http://www.google.com/bot.html)"];
+  let bp = 0, bj = 0;
+  for (const ua of bots) {
+    for (const a of [undefined, "*/*", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"]) {
+      const r = await get("/", { accept: a, ua });
+      const d = (/<meta name="description" content="([^"]*)">/.exec(r.body) || [])[1] || "";
+      if (r.s === 200 && r.ct === "text/html; charset=utf-8" && r.body === pg && r.vary === VARY && /<title>[^<]{10,69}<\/title>/.test(r.body) && d.length >= 25 && /<html lang="[a-z]{2}">/.test(r.body) && (r.body.match(/<h1>/g) || []).length === 1) bp++;
+    }
+    for (const a of ["application/json", "application/json, text/event-stream, */*"]) { const r = await get("/", { accept: a, ua }); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === VARY) bj++; }
+  }
+  ok("GET /: bingbot と Googlebot の 5 つの名乗りで Accept 無し、*/*、browser の形の 15 通りは browser と byte まで同じ頁(title、description、lang、h1 1 つ)", bp === 15);
+  ok("GET /: bingbot と Googlebot が application/json を挙げた 10 通りは今までどおり JSON", bj === 10);
+  let pj = 0;
+  for (const ua of [undefined, "curl/8.7.1", "Python-urllib/3.13", "python-requests/2.32.3", "node", "undici", "mcp-client/1.0", "glama-inspector/1"]) for (const a of [undefined, "*/*", "application/json", "application/json, text/event-stream, */*"]) { const r = await get("/", { accept: a, ua }); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === VARY) pj++; }
+  ok("GET /: curl、Python(urllib と requests)、Node、MCP の client の 32 通りは今までの JSON と byte まで同じ", pj === 32);
+
+  const sm = await get("/sitemap.xml");
+  ok("GET /sitemap.xml: 200 application/xml の urlset(sitemaps.org 0.9)、root の 1 URL、lastmod 無し", sm.s === 200 && sm.ct === "application/xml; charset=utf-8" && sm.body === '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://femtech.horizonshield.dev/</loc></url>\n</urlset>\n');
+  const rb = await get("/robots.txt");
+  ok("GET /robots.txt: text/plain で User-agent: *、Allow: /、Sitemap の行が 1 つ(sitemap.xml)", rb.s === 200 && rb.ct === "text/plain; charset=utf-8" && rb.body === "User-agent: *\nAllow: /\n\nSitemap: https://femtech.horizonshield.dev/sitemap.xml\n");
+
+  // 名の無い GET と HEAD の path は 404。本文は path によらず同じ bytes の {"error":"not found"}、HEAD は本文無し。
+  const unknown = ["/no-such-path", "/favicon.ico", "/sse", "/health/", "/registry/x", "/mcp/x", "/x.txt", "/.well-known/no-such", "/robots.txt/x", "/" + "a".repeat(5000)];
+  let u404 = 0, uh404 = 0;
+  for (const pth of unknown) {
+    const r = await get(pth); if (r.s === 404 && r.ct.startsWith("application/json") && r.body === '{"error":"not found"}') u404++;
+    const h = await req(pth, { method: "HEAD" }); if (h.status === 404 && (await h.text()) === "") uh404++;
+  }
+  ok("名の無い path 10 通り(5,000 字の path を含む)の GET は 404 で本文はどれも同じ bytes の {\"error\":\"not found\"}、HEAD は 404 で本文無し", u404 === unknown.length && uh404 === unknown.length);
+  let nh = 0;
+  for (const pth of ["/registry", "/check-source", "/anchor/pending", "/a2a", "/health", "/self", "/llms.txt", "/checker", "/start", "/badge"]) { const h = await req(pth, { method: "HEAD" }); if (h.status === 200) nh++; }
+  let rh = 0;
+  for (const a of [undefined, "*/*", "application/json", BROWSER]) { const h = await req("/", { method: "HEAD", accept: a }); const b = await h.text(); const wantHtml = a === BROWSER; if (h.status === 200 && b === (wantHtml ? "" : ref.body) && h.headers.get("vary") === VARY && (h.headers.get("content-type") || "").startsWith(wantHtml ? "text/html" : "application/json")) rh++; }
+  ok("名を決めた path の HEAD 10 通りは今までどおり 200、/ の HEAD は Accept 4 通りとも今までどおり(200、Vary 3 つ、型は Accept の決まりどおり。頁は本文無し、JSON は GET と同じ本文を返す形のまま。本番の端は HEAD の本文を落とす)", nh === 10 && rh === 4);
+  // / に Accept: text/event-stream だけの GET は今までどおり JSON の byte(MCP の Streamable HTTP の client が打つ形)。
+  const es = await get("/", { accept: "text/event-stream" });
+  ok("GET / に Accept: text/event-stream だけは今までの JSON と byte まで同じ、Vary も同じ", es.s === 200 && es.ct === ref.ct && es.body === ref.body && es.vary === VARY);
+  // /mcp は一覧と記録に載る MCP の口。GET、HEAD、POST、OPTIONS とも今までどおり(GET は / の JSON の byte、Vary 無し)。
+  let mg = 0;
+  for (const a of [undefined, "application/json", "text/event-stream"]) { const r = await get("/mcp", { accept: a }); if (r.s === 200 && r.ct === ref.ct && r.body === ref.body && r.vary === null) mg++; }
+  const mh = await req("/mcp", { method: "HEAD" }); const mo = await req("/mcp", { method: "OPTIONS" });
+  const mp = await req("/mcp", { method: "POST", body: JSON.stringify({ jsonrpc: "2.0", id: 9, method: "tools/list" }) }); const mpj = JSON.parse(await mp.text());
+  ok("/mcp: GET(Accept 無し、application/json、text/event-stream)は / の JSON と byte まで同じ、HEAD は 200、POST の tools/list は 9 本、OPTIONS は 200", mg === 3 && mh.status === 200 && mp.status === 200 && mpj.result.tools.length === 9 && mo.status === 200);
+  // code が名を決めて返している GET の path は今までどおり(名の無い path の 404 に落ちない)。
+  const known = [["/", "application/json"], ["/?format=json", "application/json"], ["/health", "application/json"], ["/self", "application/json"], ["/llms.txt", "text/plain"], ["/.well-known/agent-card.json", "application/json"], ["/.well-known/jwks.json", "application/json"], ["/registry", "application/json"], ["/checker", "text/html"], ["/start", "text/html"], ["/check-source?url=https%3A%2F%2Fwww.jsog.or.jp%2F", "application/json"], ["/badge", "image/svg+xml"], ["/anchor/pending", "application/json"], ["/a2a", "application/json"], ["/robots.txt", "text/plain"], ["/sitemap.xml", "application/xml"]];
+  let k200 = 0; const kbad = [];
+  for (const [pth, ct] of known) { const r = await get(pth); if (r.s === 200 && r.ct.startsWith(ct)) k200++; else kbad.push(pth + " " + r.s); }
+  const adm = [await get("/admin/reverify_seed"), await get("/admin/retract")];
+  ok("名を決めた GET の path 16 通りは 200 で今の型、/admin の 2 つは今までどおり 403" + (kbad.length ? "(" + kbad.join(", ") + ")" : ""), k200 === known.length && adm.every((r) => r.s === 403));
+  // MCP(POST / の JSON-RPC)、A2A、OPTIONS は替えない。
+  const rpc = async (path, msg) => { const r = await req(path, { method: "POST", body: JSON.stringify(msg) }); return { s: r.status, body: await r.text() }; };
+  const tl = await rpc("/", { jsonrpc: "2.0", id: 1, method: "tools/list" });
+  const ini = await rpc("/", { jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "h", version: "0" } } });
+  const nt = await rpc("/", { jsonrpc: "2.0", method: "notifications/initialized" });
+  const other = await rpc("/no-such-path", { jsonrpc: "2.0", id: 3, method: "ping" });
+  const a2a = await rpc("/a2a", { jsonrpc: "2.0", id: 4, method: "message/send", params: { message: { role: "user", parts: [{ kind: "text", text: "https://www.jsog.or.jp/" }], messageId: "m1" } } });
+  const op = await req("/no-such-path", { method: "OPTIONS" });
+  ok("POST / の tools/list(9 本)と initialize、通知の 202、名の無い path への POST の JSON-RPC、POST /a2a、OPTIONS は今までどおり",
+    tl.s === 200 && JSON.parse(tl.body).result.tools.length === 9 && ini.s === 200 && JSON.parse(ini.body).result.serverInfo.name === "hs-femtech-mcp" && nt.s === 202 && other.s === 200 && JSON.parse(other.body).id === 3 && a2a.s === 200 && JSON.parse(a2a.body).id === 4 && op.status === 200);
 }
 
 console.log(`\n  ${pass} green / ${fail} red`);

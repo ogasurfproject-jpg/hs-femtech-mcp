@@ -953,6 +953,17 @@ function rootWantsHtml(request, url) {
   return ROOT_PAGE_UA.test(ua) && !ROOT_PAGE_UA_PROGRAM.test(ua);
 }
 
+// 2026-11-19: robots.txt と sitemap.xml。今までは名の無い path と同じく GET / の JSON を 200 で返していた(robots.txt が
+// 無い形)。sitemap は root の 1 頁(browser と crawler に HTML で答える頁)。lastmod は書かない(頁に自分の日付が無い)。
+const robotsTxt = (origin) => ["User-agent: *", "Allow: /", "", "Sitemap: " + origin + "/sitemap.xml", ""].join("\n");
+const sitemapXml = (origin) =>
+  '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+  "  <url><loc>" + origin + "/</loc></url>\n</urlset>\n";
+
+// 名を決めた path。fetch の中で名を挙げて答える物と、一覧と記録に載る MCP の口 /mcp。ここに無い path の GET と HEAD は 404。
+const NAMED_PATHS = new Set(["/", "/health", "/self", "/.well-known/agent-card.json", "/.well-known/jwks.json", "/llms.txt", "/robots.txt", "/sitemap.xml",
+  "/registry", "/checker", "/start", "/check-source", "/badge", "/anchor/pending", "/a2a", "/admin/reverify_seed", "/admin/retract", "/mcp"]);
+
 async function rootFace(request, url, res) {
   if (url.pathname !== "/" || (request.method !== "GET" && request.method !== "HEAD")) return res;
   const headers = new Headers(res.headers);
@@ -997,6 +1008,8 @@ export default {
     if (url.pathname === "/.well-known/agent-card.json") return j(withCardSignature(AGENT_CARD, url.origin));
     if (url.pathname === "/.well-known/jwks.json") return j(jwksDocument());
     if (url.pathname === "/llms.txt") return new Response(llmsTxt(), { headers: { "content-type": "text/plain; charset=utf-8", "access-control-allow-origin": "*" } });
+    if (url.pathname === "/robots.txt" && request.method === "GET") return new Response(robotsTxt(url.origin), { headers: { "content-type": "text/plain; charset=utf-8", "access-control-allow-origin": "*" } });
+    if (url.pathname === "/sitemap.xml" && request.method === "GET") return new Response(sitemapXml(url.origin), { headers: { "content-type": "application/xml; charset=utf-8", "access-control-allow-origin": "*" } });
     if (url.pathname === "/registry" && request.method === "GET") return j(emit(await tool_list_registry(Object.fromEntries(url.searchParams), env)));
     if (url.pathname === "/checker") return new Response(checkerPage(), { headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*" } });
     if (url.pathname === "/start") return new Response(startPage(), { headers: { "content-type": "text/html; charset=utf-8", "access-control-allow-origin": "*" } });
@@ -1019,6 +1032,14 @@ export default {
       // 以前は -32601 "method not found" を id:null で返しとって、mcp-proxy 側が壊れとった(Glama の実行ログ 2026-09-07)。
       if (isRpcNotification(msg)) return new Response(null, { status: 202, headers: JSON_HEADERS });
       try { return j(await handleRpc(msg, env)); } catch (e) { return j(rpcError(msg && msg.id !== undefined ? msg.id : null, -32603, "internal: " + (e && e.message)), 500); }
+    }
+
+    // 2026-11-19: GET と HEAD で名の無い path は 404(本文は {"error":"not found"} だけ。HEAD は本文無し)。今までは / と
+    // 同じ JSON を 200 で返し、crawler には中身の同じ頁が名を替えていくつも在る形に見えていた(/robots.txt と /sitemap.xml も
+    // それだった)。名を決めた path(NAMED_PATHS。/mcp は一覧と記録に載る MCP の口)と /、POST(MCP の JSON-RPC と A2A)、
+    // OPTIONS は今までどおり。
+    if ((request.method === "GET" || request.method === "HEAD") && !NAMED_PATHS.has(url.pathname)) {
+      return new Response(request.method === "HEAD" ? null : JSON.stringify({ error: "not found" }), { status: 404, headers: JSON_HEADERS });
     }
 
     return rootFace(request, url, j({ server: "hs-femtech-mcp", version: VERSION, description: "中立のフェム情報源 検証レジストリ。診断・推奨・効能なし。 / Neutral femtech source-verification registry.", endpoints: ["POST / (MCP JSON-RPC)", "POST /a2a (A2A SendMessage / message/send)", "GET /health", "GET /self", "GET /llms.txt", "GET /.well-known/agent-card.json", "GET /.well-known/jwks.json", "GET /registry", "GET /checker", "GET /start", "GET /check-source?url=...", "GET /badge?url=...", "GET /anchor/pending"], topics: ["menstruation", "pms", "menopause"], disclaimer: DISCLAIMER }));
