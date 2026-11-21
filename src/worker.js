@@ -964,6 +964,17 @@ const sitemapXml = (origin) =>
 const NAMED_PATHS = new Set(["/", "/health", "/self", "/.well-known/agent-card.json", "/.well-known/jwks.json", "/llms.txt", "/robots.txt", "/sitemap.xml",
   "/registry", "/checker", "/start", "/check-source", "/badge", "/anchor/pending", "/a2a", "/admin/reverify_seed", "/admin/retract", "/mcp"]);
 
+// 2026-11-21: GET と HEAD の /mcp に X-Robots-Tag: noindex。/mcp は MCP の口で、GET は / と同じサービスの説明の JSON を返す。
+// sitemap に無いのに Bing が外の link から見つけて頁として索引に入れ、Missing Title を出した(JSON に title は付けられない)。
+// status と body と他の header は替えない。POST(MCP の JSON-RPC)と OPTIONS はこの手前で返るので替わらない。
+// robots.txt で Disallow にはしない(塞ぐと crawler が noindex を読めない)。
+function mcpNoindex(request, url, res) {
+  if (url.pathname !== "/mcp" || (request.method !== "GET" && request.method !== "HEAD")) return res;
+  const headers = new Headers(res.headers);
+  headers.set("x-robots-tag", "noindex");
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
 async function rootFace(request, url, res) {
   if (url.pathname !== "/" || (request.method !== "GET" && request.method !== "HEAD")) return res;
   const headers = new Headers(res.headers);
@@ -1042,7 +1053,7 @@ export default {
       return new Response(request.method === "HEAD" ? null : JSON.stringify({ error: "not found" }), { status: 404, headers: JSON_HEADERS });
     }
 
-    return rootFace(request, url, j({ server: "hs-femtech-mcp", version: VERSION, description: "中立のフェム情報源 検証レジストリ。診断・推奨・効能なし。 / Neutral femtech source-verification registry.", endpoints: ["POST / (MCP JSON-RPC)", "POST /a2a (A2A SendMessage / message/send)", "GET /health", "GET /self", "GET /llms.txt", "GET /.well-known/agent-card.json", "GET /.well-known/jwks.json", "GET /registry", "GET /checker", "GET /start", "GET /check-source?url=...", "GET /badge?url=...", "GET /anchor/pending"], topics: ["menstruation", "pms", "menopause"], disclaimer: DISCLAIMER }));
+    return mcpNoindex(request, url, await rootFace(request, url, j({ server: "hs-femtech-mcp", version: VERSION, description: "中立のフェム情報源 検証レジストリ。診断・推奨・効能なし。 / Neutral femtech source-verification registry.", endpoints: ["POST / (MCP JSON-RPC)", "POST /a2a (A2A SendMessage / message/send)", "GET /health", "GET /self", "GET /llms.txt", "GET /.well-known/agent-card.json", "GET /.well-known/jwks.json", "GET /registry", "GET /checker", "GET /start", "GET /check-source?url=...", "GET /badge?url=...", "GET /anchor/pending"], topics: ["menstruation", "pms", "menopause"], disclaimer: DISCLAIMER })));
   }
 };
 

@@ -317,5 +317,40 @@ ok("HTTP: id 付き ping は今までどおり 200 result", pingRes.status === 2
     tl.s === 200 && JSON.parse(tl.body).result.tools.length === 9 && ini.s === 200 && JSON.parse(ini.body).result.serverInfo.name === "hs-femtech-mcp" && nt.s === 202 && other.s === 200 && JSON.parse(other.body).id === 3 && a2a.s === 200 && JSON.parse(a2a.body).id === 4 && op.status === 200);
 }
 
+// 32 GET と HEAD の /mcp に X-Robots-Tag: noindex(2026-11-21)。status、body、型、Vary は替えない。POST と OPTIONS、ほかの path には付けない。
+{
+  const req = (path, { method = "GET", accept, ua, body } = {}) => {
+    const h = {}; if (accept !== undefined) h.accept = accept; if (ua !== undefined) h["user-agent"] = ua; if (body !== undefined) h["content-type"] = "application/json";
+    return mod.default.fetch(new Request("https://femtech.horizonshield.dev" + path, { method, headers: h, body }), {}, { waitUntil() {} });
+  };
+  const ref = await (await req("/?format=json")).text();
+  const BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+  const UAS = [undefined, "curl/8.7.1", "mcp-client/1.0", "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"];
+  let mg = 0, mh = 0, n = 0;
+  for (const ua of UAS) for (const a of [undefined, "*/*", "application/json", "text/event-stream", "application/json, text/event-stream", BROWSER]) {
+    n++;
+    const r = await req("/mcp", { accept: a, ua }); const b = await r.text();
+    if (r.status === 200 && r.headers.get("x-robots-tag") === "noindex" && b === ref && r.headers.get("content-type") === "application/json; charset=utf-8" && r.headers.get("vary") === null && r.headers.get("access-control-allow-origin") === "*") mg++;
+    const h = await req("/mcp", { method: "HEAD", accept: a, ua });
+    if (h.status === 200 && h.headers.get("x-robots-tag") === "noindex" && h.headers.get("content-type") === "application/json; charset=utf-8") mh++;
+  }
+  ok("GET /mcp: 名乗り 6 x Accept 6 の 36 通りとも 200、X-Robots-Tag: noindex、本文は / の JSON と byte まで同じ、型と CORS は今までどおり、Vary 無し", mg === n && n === 36);
+  ok("HEAD /mcp: 36 通りとも 200、X-Robots-Tag: noindex、型は今までどおり", mh === n);
+  const rpc = async (path, msg) => { const r = await req(path, { method: "POST", body: JSON.stringify(msg) }); return { s: r.status, x: r.headers.get("x-robots-tag"), body: await r.text() }; };
+  const INI = { jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "h", version: "0" } } };
+  const pi = await rpc("/mcp", INI), ri = await rpc("/", INI);
+  const pt = await rpc("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }), rt = await rpc("/", { jsonrpc: "2.0", id: 1, method: "tools/list" });
+  const pn = await rpc("/mcp", { jsonrpc: "2.0", method: "notifications/initialized" });
+  const po = await req("/mcp", { method: "OPTIONS" });
+  ok("POST /mcp の initialize と tools/list は POST / と byte まで同じで X-Robots-Tag 無し、通知は 202、OPTIONS /mcp は 200 で X-Robots-Tag 無し",
+    pi.s === 200 && pi.x === null && pi.body === ri.body && JSON.parse(pi.body).result.serverInfo.name === "hs-femtech-mcp" && pt.s === 200 && pt.x === null && pt.body === rt.body && JSON.parse(pt.body).result.tools.length === 9 && pn.s === 202 && pn.x === null && po.status === 200 && po.headers.get("x-robots-tag") === null);
+  let other = 0; const obad = [];
+  const paths = [["/", undefined], ["/", BROWSER], ["/", "*/*"], ["/?format=json", undefined], ["/health", undefined], ["/self", undefined], ["/llms.txt", undefined], ["/.well-known/agent-card.json", undefined], ["/.well-known/jwks.json", undefined], ["/registry", undefined], ["/checker", undefined], ["/start", undefined], ["/badge", undefined], ["/anchor/pending", undefined], ["/a2a", undefined], ["/robots.txt", undefined], ["/sitemap.xml", undefined], ["/mcp/x", undefined], ["/no-such-path", undefined]];
+  for (const [pth, a] of paths) for (const m of ["GET", "HEAD"]) { const r = await req(pth, { method: m, accept: a }); if (r.headers.get("x-robots-tag") === null) other++; else obad.push(m + " " + pth); }
+  ok("/mcp の外の path(/ の頁と JSON、名を決めた path、名の無い path、/mcp/x)の GET と HEAD 38 通りには X-Robots-Tag を付けない" + (obad.length ? "(" + obad.join(", ") + ")" : ""), other === paths.length * 2);
+  const rb = await (await req("/robots.txt")).text();
+  ok("/robots.txt は替えない(Disallow の行が無い。塞ぐと crawler が noindex を読めない)", rb === "User-agent: *\nAllow: /\n\nSitemap: https://femtech.horizonshield.dev/sitemap.xml\n" && !/disallow/i.test(rb));
+}
+
 console.log(`\n  ${pass} green / ${fail} red`);
 if (fail > 0) process.exit(1);
