@@ -15,6 +15,7 @@ It does not diagnose, does not claim products work, does not take referral fees,
 ![verified sources](https://img.shields.io/badge/verified%20sources-11-5B8DEF?labelColor=0E141D)
 ![medical advice](https://img.shields.io/badge/medical%20advice-none-E8B14C?labelColor=0E141D)
 ![license](https://img.shields.io/badge/license-MIT-8892A0?labelColor=0E141D)
+[![ogasurfproject-jpg/hs-femtech-mcp MCP server](https://glama.ai/mcp/servers/ogasurfproject-jpg/hs-femtech-mcp/badges/score.svg)](https://glama.ai/mcp/servers/ogasurfproject-jpg/hs-femtech-mcp)
 
 Live endpoint: `https://femtech.horizonshield.dev` (also `https://hs-femtech-mcp.oga-surf-project.workers.dev`)
 
